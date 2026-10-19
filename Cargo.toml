@@ -1,0 +1,23 @@
+[package]
+name = "nibkit-menu-c"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.87"
+description = "nibkit's menu (DSlot's menu, for an app's touch screen) for C and C++ apps: a static library and include/nibkit_menu.h"
+license = "MIT"
+repository = "https://github.com/abradburne/nibos"
+
+[lib]
+name = "nibkit_menu"
+crate-type = ["staticlib", "rlib"]
+
+# The system, as nibkit's: nibOS (the default) or the stock OS.
+[features]
+default = ["nibos"]
+nibos = ["nibkit/nibos"]
+stock = ["nibkit/stock"]
+
+[dependencies]
+nibkit = { path = "../nibkit", default-features = false, features = ["menu-raster"] }
+
+[workspace]

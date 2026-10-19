@@ -31,6 +31,7 @@ compile_error!("nibkit: build for a system: feature `nibos` (the default) or `st
 pub mod audio;
 pub mod backlight;
 pub mod battery;
+pub mod clock;
 pub mod device;
 #[cfg(feature = "dslot")]
 pub mod dslot;

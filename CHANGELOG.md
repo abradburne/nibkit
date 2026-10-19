@@ -16,3 +16,8 @@
   held 1.5 s), never storing up repeats it couldn't keep up with.
 - `clock`: a 12-hour or 24-hour clock for every app (`~/.config/nibos/prefs.toml`, else the
   locale's habit), and the time formatted that way.
+- `menu` (feature): the menu every app shows on the touch screen, as DSlot draws it: a page of
+  rows under tabs, or a shelf of cards (save states), laid out as `Draw`s in DSlot's sizes and
+  colours; the buttons and touches answered as DSlot's menu does; with `menu-raster`, drawn into
+  an RGBA picture in Roboto Condensed (Apache-2.0, embedded in `assets/`). For emulators' in-game
+  menus, so every one looks and works as DSlot.

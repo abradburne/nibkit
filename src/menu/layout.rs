@@ -1,0 +1,553 @@
+//! Where everything goes: DSlot's menu, measured off its code (ui/draw.rs, ui/menu.rs), on a
+//! 1024 × 768 screen. Text is placed by the top of its line box (the font's ascent plus 1 unit
+//! over it, as DSlot renders a line) and an anchor along it.
+
+use super::colour::{self, Rgb};
+use super::model::{Menu, Shelf, Slot, Status, Value};
+use super::{H, W};
+
+/// The first row's centre, how far apart rows are, and how many fit.
+pub const TOP: f32 = 156.0;
+pub const ROW_STEP: f32 = 46.0;
+pub const VISIBLE: usize = 10;
+/// The tabs: the first one's corner, and each one's size.
+pub const TABS: (f32, f32, f32, f32) = (28.0, 10.0, 130.0, 40.0);
+/// Labels start here; values end here.
+pub const LEFT: f32 = 150.0;
+pub const RIGHT: f32 = W - 150.0;
+/// The bar along the bottom, and the hint line above it.
+pub const BAR_H: f32 = 96.0;
+pub const HINT_Y: f32 = 636.0;
+/// A star, and the battery icon's height.
+pub const ICON: f32 = 26.0;
+pub const BATTERY: f32 = 22.0;
+
+/// One thing to draw.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Draw {
+    /// A filled rectangle.
+    Rect {
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        colour: Rgb,
+    },
+    /// A filled rectangle with its corners rounded by `radius`.
+    Round {
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        radius: f32,
+        colour: Rgb,
+    },
+    /// A rectangle's outline, `width` thick inside it, corners rounded by `radius`.
+    Frame {
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        radius: f32,
+        width: f32,
+        colour: Rgb,
+    },
+    /// One line of text, `size` units high, the top of its line box at `y`; `anchor` is where
+    /// `x` falls along it: 0 its left end, 0.5 its middle, 1 its right end.
+    Text {
+        text: String,
+        size: f32,
+        bold: bool,
+        x: f32,
+        y: f32,
+        anchor: f32,
+        colour: Rgb,
+    },
+    /// `rating` of 5 stars from `x`, each `ICON` square, 4 apart; the rest faint.
+    Stars { x: f32, y: f32, rating: u8 },
+    /// The battery icon, `h` tall and 2.1 times as wide.
+    Battery {
+        x: f32,
+        y: f32,
+        h: f32,
+        percent: u8,
+        charging: bool,
+    },
+    /// The bar, the slot cut into its top edge.
+    Bar { y: f32, slot: Slot },
+    /// One of the app's own pictures (a save state's), scaled into the box; `faded` dims it.
+    Picture {
+        index: usize,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        faded: bool,
+    },
+}
+
+/// A row's centre on screen, by its place among those on screen.
+pub fn row_y(place: usize) -> f32 {
+    TOP + place as f32 * ROW_STEP
+}
+
+/// The row on screen under a touch, counting from the first on screen.
+pub fn row_hit(y: f32) -> Option<usize> {
+    (0..VISIBLE).find(|&r| (y - row_y(r)).abs() < ROW_STEP / 2.0)
+}
+
+/// The tab under a touch, of `n`.
+pub fn tab_hit(x: f32, y: f32, n: usize) -> Option<usize> {
+    let (tx, ty, w, h) = TABS;
+    let inside = n > 0
+        && (ty - 10.0..ty + h + 14.0).contains(&y)
+        && (tx..tx + n as f32 * w).contains(&x)
+        && x < W;
+    inside.then(|| (((x - tx) / w) as usize).min(n - 1))
+}
+
+fn text(s: &str, (size, bold): (f32, bool), (x, y): (f32, f32), anchor: f32, colour: Rgb) -> Draw {
+    Draw::Text {
+        text: s.to_owned(),
+        size,
+        bold,
+        x,
+        y,
+        anchor,
+        colour,
+    }
+}
+
+fn tabs(out: &mut Vec<Draw>, tabs: &[(String, bool)]) {
+    let (x, y, w, h) = TABS;
+    for (i, (label, on)) in tabs.iter().enumerate() {
+        let at = x + i as f32 * w;
+        out.push(Draw::Rect {
+            x: at,
+            y,
+            w: w - 2.0,
+            h,
+            colour: if *on { colour::WHITE } else { colour::PANEL },
+        });
+        let ink = if *on { colour::TAB_INK } else { colour::DIM };
+        out.push(text(
+            label,
+            (22.0, true),
+            (at + (w - 2.0) / 2.0, y + 7.0),
+            0.5,
+            ink,
+        ));
+    }
+}
+
+/// The hint line and the bar with the battery and the clock.
+fn footer(out: &mut Vec<Draw>, hint: &str, status: &Status) {
+    out.push(text(
+        hint,
+        (18.0, false),
+        (W / 2.0, HINT_Y),
+        0.5,
+        colour::FAINT,
+    ));
+    out.push(Draw::Bar {
+        y: H - BAR_H,
+        slot: status.slot,
+    });
+    if let Some((percent, charging)) = status.battery {
+        let w = BATTERY * 2.1;
+        out.push(Draw::Battery {
+            x: 40.0,
+            y: H - 59.0,
+            h: BATTERY,
+            percent,
+            charging,
+        });
+        out.push(text(
+            &format!("{percent}%"),
+            (24.0, true),
+            (40.0 + w + 10.0, H - 62.0),
+            0.0,
+            colour::DIM,
+        ));
+    }
+    out.push(text(
+        &status.clock,
+        (24.0, true),
+        (W - 40.0, H - 62.0),
+        1.0,
+        colour::DIM,
+    ));
+}
+
+/// A page of rows, as DSlot's menu draws one.
+pub fn menu(m: &Menu, status: &Status) -> Vec<Draw> {
+    let mut out = Vec::new();
+    tabs(&mut out, &m.tabs);
+    out.push(text(
+        &m.title,
+        (22.0, true),
+        (LEFT, 72.0),
+        0.0,
+        colour::FAINT,
+    ));
+    let shown = m.rows.iter().enumerate().skip(m.scroll).take(VISIBLE);
+    for (place, (i, row)) in shown.enumerate() {
+        let y = row_y(place);
+        if row.heading {
+            out.push(text(
+                &row.label,
+                (20.0, true),
+                (LEFT, y - 6.0),
+                0.0,
+                colour::FAINT,
+            ));
+            continue;
+        }
+        let lit = i == m.row;
+        if lit {
+            out.push(Draw::Rect {
+                x: 120.0,
+                y: y - ROW_STEP / 2.0 + 2.0,
+                w: W - 240.0,
+                h: ROW_STEP - 4.0,
+                colour: colour::PANEL,
+            });
+        }
+        let ink = if lit { colour::WHITE } else { colour::DIM };
+        out.push(text(&row.label, (26.0, false), (LEFT, y - 16.0), 0.0, ink));
+        let value = (26.0, true);
+        match &row.value {
+            Value::None => {}
+            Value::Text(t) | Value::Inherited(t) => {
+                let ink = match row.value {
+                    Value::Inherited(_) => colour::DIM,
+                    _ => colour::WHITE,
+                };
+                let t = if lit {
+                    format!("\u{2039}   {t}   \u{203a}")
+                } else {
+                    t.clone()
+                };
+                out.push(text(&t, value, (RIGHT, y - 16.0), 1.0, ink));
+            }
+            Value::More(t) => {
+                out.push(text(
+                    &format!("{t}   \u{203a}"),
+                    value,
+                    (RIGHT, y - 16.0),
+                    1.0,
+                    colour::WHITE,
+                ));
+            }
+            Value::Prompt { text: t, warning } => {
+                let ink = if *warning { colour::RED } else { colour::WHITE };
+                out.push(text(t, value, (RIGHT, y - 16.0), 1.0, ink));
+            }
+            Value::Stars(rating) => {
+                let w = 5.0 * (ICON + 4.0) - 4.0;
+                out.push(Draw::Stars {
+                    x: RIGHT - w,
+                    y: y - ICON / 2.0,
+                    rating: *rating,
+                });
+            }
+            Value::Slider(percent) => {
+                out.push(text(
+                    &format!("{percent}%"),
+                    value,
+                    (RIGHT, y - 16.0),
+                    1.0,
+                    colour::WHITE,
+                ));
+                let (bar, gap) = (180.0, 76.0);
+                let x = RIGHT - gap - bar;
+                let track = [
+                    colour::PANEL[0] + 30,
+                    colour::PANEL[1] + 30,
+                    colour::PANEL[2] + 30,
+                ];
+                out.push(Draw::Rect {
+                    x,
+                    y: y - 3.0,
+                    w: bar,
+                    h: 6.0,
+                    colour: track,
+                });
+                let filled = bar * (*percent as f32 / 100.0).clamp(0.0, 1.0);
+                out.push(Draw::Rect {
+                    x,
+                    y: y - 3.0,
+                    w: filled.max(1.0),
+                    h: 6.0,
+                    colour: colour::WHITE,
+                });
+            }
+        }
+    }
+    // More rows above or below: an ellipsis (the face has one; it has no arrows).
+    if m.scroll > 0 {
+        let y = row_y(0) - ROW_STEP / 2.0 - 30.0;
+        out.push(text(
+            "\u{2026}",
+            (28.0, true),
+            (RIGHT, y),
+            1.0,
+            colour::FAINT,
+        ));
+    }
+    let on_screen = m.rows.len().saturating_sub(m.scroll).min(VISIBLE);
+    if m.scroll + on_screen < m.rows.len() {
+        let y = row_y(on_screen) - ROW_STEP / 2.0 - 4.0;
+        out.push(text(
+            "\u{2026}",
+            (28.0, true),
+            (RIGHT, y),
+            1.0,
+            colour::FAINT,
+        ));
+    }
+    footer(&mut out, &m.hint, status);
+    out
+}
+
+/// The cards' boxes: the highlighted one in the middle, its neighbours either side, smaller.
+pub const CARD: (f32, f32) = (300.0, 310.0);
+pub const SIDE_CARD: (f32, f32) = (250.0, 260.0);
+pub const CARD_STEP: f32 = 330.0;
+pub const CARD_Y: f32 = 190.0;
+
+/// The box of the card `offset` places from the highlighted one (0), if it is on screen.
+pub fn card_box(offset: i32) -> Option<(f32, f32, f32, f32)> {
+    if offset.abs() > 1 {
+        return None;
+    }
+    let (w, h) = if offset == 0 { CARD } else { SIDE_CARD };
+    let cx = W / 2.0 + offset as f32 * CARD_STEP;
+    let cy = CARD_Y + CARD.1 / 2.0;
+    Some((cx - w / 2.0, cy - h / 2.0, w, h))
+}
+
+/// The card under a touch, as an offset from the highlighted one.
+pub fn card_hit(x: f32, y: f32) -> Option<i32> {
+    (-1..=1).find(|&o| {
+        card_box(o).is_some_and(|(bx, by, bw, bh)| {
+            (bx..bx + bw).contains(&x) && (by..by + bh).contains(&y)
+        })
+    })
+}
+
+/// A shelf of cards: the highlighted one big in the middle, its neighbours either side.
+pub fn shelf(s: &Shelf, status: &Status) -> Vec<Draw> {
+    let mut out = Vec::new();
+    tabs(&mut out, &s.tabs);
+    if !s.cards.is_empty() {
+        out.push(text(
+            &format!("{} / {}", s.at + 1, s.cards.len()),
+            (22.0, false),
+            (W / 2.0, 120.0),
+            0.5,
+            colour::DIM,
+        ));
+    }
+    for (i, card) in s.cards.iter().enumerate() {
+        let offset = i as i32 - s.at as i32;
+        let Some((x, y, w, h)) = card_box(offset) else {
+            continue;
+        };
+        let lit = offset == 0;
+        let pad = if lit { 16.0 } else { 14.0 };
+        let label_h = if lit { 54.0 } else { 46.0 };
+        out.push(Draw::Round {
+            x,
+            y,
+            w,
+            h,
+            radius: 14.0,
+            colour: if lit { [59, 63, 71] } else { [43, 47, 54] },
+        });
+        let (px, py, pw, ph) = (x + pad, y + pad, w - 2.0 * pad, h - pad - label_h);
+        match card.picture {
+            Some(index) => out.push(Draw::Picture {
+                index,
+                x: px,
+                y: py,
+                w: pw,
+                h: ph,
+                faded: !lit,
+            }),
+            None => {
+                out.push(Draw::Rect {
+                    x: px,
+                    y: py,
+                    w: pw,
+                    h: ph,
+                    colour: [21, 24, 30],
+                });
+                out.push(text(
+                    "Empty",
+                    (26.0, false),
+                    (px + pw / 2.0, py + ph / 2.0 - 16.0),
+                    0.5,
+                    colour::FAINT,
+                ));
+            }
+        }
+        let ink = if lit { colour::WHITE } else { colour::DIM };
+        let size = if lit { (28.0, true) } else { (24.0, false) };
+        out.push(text(
+            &card.label,
+            size,
+            (x + w / 2.0, y + h - label_h + 8.0),
+            0.5,
+            ink,
+        ));
+        if lit {
+            out.push(Draw::Frame {
+                x: x - 2.0,
+                y: y - 2.0,
+                w: w + 4.0,
+                h: h + 4.0,
+                radius: 16.0,
+                width: 4.0,
+                colour: colour::GOLD,
+            });
+        }
+    }
+    footer(&mut out, &s.hint, status);
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::menu::{Card, Row};
+
+    fn texts(d: &[Draw]) -> Vec<(String, f32, f32, Rgb)> {
+        d.iter()
+            .filter_map(|d| match d {
+                Draw::Text {
+                    text, x, y, colour, ..
+                } => Some((text.clone(), *x, *y, *colour)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn page(rows: Vec<Row>, row: usize) -> Menu {
+        Menu {
+            tabs: vec![("Play".into(), true), ("Game".into(), false)],
+            title: "TETRIS".into(),
+            rows,
+            row,
+            scroll: 0,
+            hint: "A  choose".into(),
+        }
+    }
+
+    /// The numbers are DSlot's: the first row at 156, 46 apart, labels at 150, values ending
+    /// at 874, the highlight band 784 wide from 120.
+    #[test]
+    fn rows_sit_where_dslot_puts_them() {
+        let m = page(
+            vec![
+                Row::new("Resume", Value::None),
+                Row::new("Timing", Value::Inherited("Use default (Smooth)".into())),
+                Row::new("Fast-forward", Value::Text("6x".into())),
+            ],
+            2,
+        );
+        let d = menu(&m, &Status::default());
+        let t = texts(&d);
+        assert!(t.contains(&("Resume".into(), 150.0, 140.0, colour::DIM)));
+        assert!(t.contains(&("Use default (Smooth)".into(), RIGHT, 186.0, colour::DIM)));
+        assert!(t.contains(&(
+            "\u{2039}   6x   \u{203a}".into(),
+            874.0,
+            232.0,
+            colour::WHITE
+        )));
+        assert!(t.contains(&("Fast-forward".into(), 150.0, 232.0, colour::WHITE)));
+        assert!(d.contains(&Draw::Rect {
+            x: 120.0,
+            y: 227.0,
+            w: 784.0,
+            h: 42.0,
+            colour: colour::PANEL
+        }));
+        // The selected tab is white with dark ink; the hint and the clock bar at the foot.
+        assert!(d.contains(&Draw::Rect {
+            x: 28.0,
+            y: 10.0,
+            w: 128.0,
+            h: 40.0,
+            colour: colour::WHITE
+        }));
+        assert!(t
+            .iter()
+            .any(|(s, _, y, _)| s == "A  choose" && *y == HINT_Y));
+        assert!(d
+            .iter()
+            .any(|d| matches!(d, Draw::Bar { y, .. } if *y == 672.0)));
+    }
+
+    #[test]
+    fn a_long_page_scrolls_with_ellipses() {
+        let rows = (0..14)
+            .map(|i| Row::new(format!("Row {i}"), Value::None))
+            .collect();
+        let mut m = page(rows, 0);
+        let marks = |m: &Menu| {
+            texts(&menu(m, &Status::default()))
+                .iter()
+                .filter(|t| t.0 == "\u{2026}")
+                .count()
+        };
+        assert_eq!(marks(&m), 1, "more below");
+        m.scroll = 4;
+        assert_eq!(marks(&m), 1, "more above, none below");
+        m.scroll = 2;
+        assert_eq!(marks(&m), 2);
+    }
+
+    #[test]
+    fn touches_find_rows_tabs_and_cards() {
+        assert_eq!(row_hit(156.0), Some(0));
+        assert_eq!(row_hit(156.0 + 46.0 * 3.0 + 10.0), Some(3));
+        assert_eq!(row_hit(100.0), None);
+        assert_eq!(tab_hit(30.0, 20.0, 5), Some(0));
+        assert_eq!(tab_hit(300.0, 20.0, 5), Some(2));
+        assert_eq!(tab_hit(300.0, 20.0, 2), None);
+        assert_eq!(card_hit(512.0, 300.0), Some(0));
+        assert_eq!(card_hit(180.0, 300.0), Some(-1));
+        assert_eq!(card_hit(512.0, 600.0), None);
+    }
+
+    #[test]
+    fn a_shelf_shows_the_highlighted_card_and_its_neighbours() {
+        let s = Shelf {
+            tabs: vec![],
+            cards: (0..7)
+                .map(|i| Card {
+                    picture: (i < 3).then_some(i),
+                    label: format!("{}", i + 1),
+                })
+                .collect(),
+            at: 3,
+            hint: String::new(),
+        };
+        let d = shelf(&s, &Status::default());
+        let labels: Vec<_> = texts(&d).into_iter().map(|t| t.0).collect();
+        assert!(labels.contains(&"4 / 7".to_owned()));
+        assert!(labels.contains(&"3".to_owned()) && labels.contains(&"5".to_owned()));
+        assert!(!labels.contains(&"2".to_owned()));
+        assert!(d.iter().any(|d| matches!(
+            d,
+            Draw::Picture {
+                index: 2,
+                faded: true,
+                ..
+            }
+        )));
+        assert!(labels.contains(&"Empty".to_owned()));
+    }
+}

@@ -14,11 +14,16 @@ default = ["nibos"]
 nibos = []
 stock = []
 dslot = []
+# The menu every app shows on the touch screen, as DSlot draws it (no dependencies); with
+# `menu-raster`, drawing it into a picture in Roboto Condensed (fontdue).
+menu = []
+menu-raster = ["menu", "dep:fontdue"]
 
 [dependencies]
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 toml = { version = "0.8", default-features = false, features = ["parse", "display"] }
+fontdue = { version = "0.9", optional = true }
 
 [dev-dependencies]
 # For the example only: nibkit itself uses no graphics library.

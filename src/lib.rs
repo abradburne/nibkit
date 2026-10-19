@@ -17,6 +17,7 @@
 //! | [`settings`] | Settings at three levels, system, console and game, each overriding the one before. |
 //! | [`watch`] | Noticing that a setting changed elsewhere, without waiting. |
 //! | `dslot` (feature `dslot`) | Description files, for an emulator or app that DSlot starts. |
+//! | `menu` (feature `menu`) | The menu on the touch screen, as DSlot draws it: what goes where, the buttons and touches; with `menu-raster`, drawn into a picture. |
 //!
 //! The same code runs on two systems, chosen when the app is built: **nibOS** (feature
 //! `nibos`, the default) and the RG DS+'s **stock OS** (feature `stock`). Where the stock OS
@@ -36,6 +37,8 @@ pub mod device;
 #[cfg(feature = "dslot")]
 pub mod dslot;
 pub mod input;
+#[cfg(feature = "menu")]
+pub mod menu;
 pub mod paths;
 mod platform;
 pub mod power;

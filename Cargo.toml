@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.87"
 description = "What an app on a nibOS handheld needs to know and do: both screens, vblank, the buttons' names, touch, brightness, volume, where its files go, layered settings"
-license = "MIT"
+# MIT, and the fonts in assets/ (embedded by `menu-raster`) under the SIL OFL 1.1.
+license = "MIT AND OFL-1.1"
 repository = "https://github.com/abradburne/nibos"
 
 # The system the app runs on: one of `nibos` (the default) or `stock` (the RG DS+'s own OS),

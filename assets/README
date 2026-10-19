@@ -1,3 +1,6 @@
-Roboto Condensed (Regular and Bold), by Google, under the Apache License 2.0
-(https://www.apache.org/licenses/LICENSE-2.0): the face DSlot uses, embedded by the
-`menu-raster` feature.
+Roboto Condensed (Regular and Bold), version 3.009 (2024), by Christian Robertson for Google,
+from https://github.com/googlefonts/roboto-classic: the face DSlot uses, embedded by the
+`menu-raster` feature. Copyright 2011 The Roboto Project Authors; under the SIL Open Font
+License 1.1 (the fonts' own name tables say so), in OFL.txt beside them. Anything that ships
+these fonts, or a program that embeds them (nibkit with `menu-raster`, nibkit-menu-c), ships
+OFL.txt with it.

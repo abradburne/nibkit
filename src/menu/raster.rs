@@ -1,5 +1,5 @@
 //! Drawing the menu into an RGBA picture, for an app with no text drawing of its own. Text is
-//! Roboto Condensed (Apache-2.0, the face DSlot embeds), laid out exactly as DSlot renders a
+//! Roboto Condensed (SIL OFL 1.1, `assets/OFL.txt`; the face DSlot embeds), laid out exactly as DSlot renders a
 //! line; the battery and the bar are DSlot's, drawn the same way (gfx.rs, ui/draw.rs there).
 
 use super::colour::{self, Rgb};

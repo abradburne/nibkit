@@ -9,6 +9,8 @@
 //!     backlight::set(Screen::Top, (now + 10).min(100)); // seen at once
 //!     backlight::save();                                 // when the user lets go
 //! }
+//! backlight::set_off(Screen::Bottom, true);  // the screen dark, its level kept
+//! backlight::set_off(Screen::Bottom, false); // and lit again, before the app exits
 //! ```
 
 use crate::platform;
@@ -25,6 +27,15 @@ pub fn get(screen: Screen) -> Option<u8> {
 pub fn set(screen: Screen, percent: u8) {
     if let Some(backlight) = Backlight::open(screen) {
         backlight.set_percent(percent);
+    }
+}
+
+/// Turns the screen's backlight off (or on again) without changing its level, so nothing dark
+/// is saved: `bl_power` 4 or 0. Any brightness nibOS sets lights it again; an app that turns
+/// a screen off turns it on before it exits (on SIGTERM too). Does nothing on the stock OS.
+pub fn set_off(screen: Screen, off: bool) {
+    if let Some(backlight) = Backlight::open(screen) {
+        backlight.set_power(off);
     }
 }
 
@@ -92,6 +103,23 @@ impl Backlight {
     }
 }
 
+impl Backlight {
+    fn set_power(&self, off: bool) {
+        if let Err(e) = std::fs::write(self.dir.join("bl_power"), bl_power(off)) {
+            eprintln!("nibkit: {}: {e}", self.dir.display());
+        }
+    }
+}
+
+/// The kernel's `bl_power` value: FB_BLANK_POWERDOWN (4) or FB_BLANK_UNBLANK (0).
+fn bl_power(off: bool) -> &'static str {
+    if off {
+        "4"
+    } else {
+        "0"
+    }
+}
+
 /// The floor, in percent of the maximum: the board's NIBOS_BACKLIGHT_MIN_PERCENT, else 2.
 fn min_percent(board_conf: &Path) -> i64 {
     let conf = std::fs::read_to_string(board_conf).unwrap_or_default();
@@ -140,6 +168,12 @@ mod tests {
         assert_eq!(to_level(50, 1, 255, false), 1 + 64);
         assert_eq!(to_percent(65, 1, 255, false), 50);
         assert_eq!(floor(10, 2), 1);
+    }
+
+    #[test]
+    fn power() {
+        assert_eq!(bl_power(true), "4");
+        assert_eq!(bl_power(false), "0");
     }
 
     #[test]

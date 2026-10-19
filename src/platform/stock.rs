@@ -7,6 +7,8 @@ use crate::screens::Layout;
 use std::path::Path;
 
 pub const NAME: &str = "stock";
+/// As apps name it in `runs_on`.
+pub const KEY: &str = "stock";
 
 pub fn on_device() -> bool {
     Path::new("/mnt/vendor").is_dir()

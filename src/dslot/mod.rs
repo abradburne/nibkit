@@ -18,7 +18,10 @@
 //!
 //! Systems are named as the `Roms/` folders are: `NDS`, `GBA`, `GB`, `GBC`.
 
+mod apps;
 mod launch;
+
+pub use apps::{apps, App, Found};
 
 pub use launch::{description_dirs, fill, matches, saves_dir, Placeholders};
 

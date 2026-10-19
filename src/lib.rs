@@ -9,7 +9,7 @@
 //! | [`input`] | The buttons by what is printed on them, the gamepad's name, the Menu and Back keys. |
 //! | [`touch`] | The touch panel, read straight from evdev. |
 //! | [`backlight`] | Each screen's brightness, in percent. |
-//! | [`battery`] | The battery's charge, time to full, and battery protect (stop at 80%). |
+//! | [`battery`] | The battery's charge, time to full, and battery protect (stop at about 80%). |
 //! | [`device`] | Volume, Wi-Fi, sleeping, restarting, powering off. |
 //! | [`power`] | The power menu's request (a long press of power on nibOS), and what a game does when it is put away for it. |
 //! | [`audio`] | The sample rate and buffer size that suit the system's sound server. |

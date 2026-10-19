@@ -1,7 +1,8 @@
 //! The battery: its charge, whether it is charging, an estimate of the time to full, and
-//! **battery protect**, nibOS's switch that stops charging at 80% (and starts again at 75%) so
-//! a device left on its charger ages slower. On nibOS the charge is the RK817's coulomb count,
-//! the same count protect uses. The stock OS keeps all this to itself: `None` there.
+//! **battery protect**, nibOS's switch that stops charging at about 80% so a device left on
+//! its charger ages slower (it lowers the charge voltage; the battery stays connected). On
+//! nibOS the charge is the RK817's coulomb count. The stock OS keeps all this to itself:
+//! `None` there.
 //!
 //! ```no_run
 //! use nibkit::battery;
@@ -46,13 +47,18 @@ pub struct Battery {
 }
 
 impl Battery {
-    /// While charging, the time to full at the current now (or to battery protect's stop, if
-    /// on). An estimate: the current falls near the end, so the last part takes longer.
+    /// While charging, the time to full at the current now (or to battery protect's stop, about
+    /// [`PROTECT_PERCENT`], if on). An estimate: the current falls near the end, so the last
+    /// part takes longer.
     pub fn time_to_full(&self) -> Option<Duration> {
         if self.state != State::Charging || self.current_ua <= 0 {
             return None;
         }
-        let end = protect_end().unwrap_or(100) as i64;
+        let end = if protect() == Some(true) {
+            PROTECT_PERCENT
+        } else {
+            100
+        } as i64;
         let to_go = (self.full_uah * end / 100 - self.charge_uah).max(0);
         Some(Duration::from_secs((to_go * 3600 / self.current_ua) as u64))
     }
@@ -87,17 +93,16 @@ pub fn read() -> Option<Battery> {
     })
 }
 
-/// Battery protect's stop, in percent, while it is on.
-fn protect_end() -> Option<u8> {
-    let (battery, _) = platform::BATTERY?;
-    let end = number(battery, "charge_control_end_threshold")?;
-    (end < 100).then_some(end as u8)
-}
+/// About where battery protect stops a charge, in percent: the cell charged to the lowered
+/// voltage (4.1 V on the RG DS+) holds about 80-85%.
+pub const PROTECT_PERCENT: u8 = 80;
 
-/// Whether battery protect is on; `None` where there is no such switch.
+/// Whether battery protect is on (the charge voltage set below the battery's full one);
+/// `None` where there is no such switch.
 pub fn protect() -> Option<bool> {
     let (battery, _) = platform::BATTERY?;
-    number(battery, "charge_control_end_threshold").map(|end| end < 100)
+    let now = number(battery, "constant_charge_voltage")?;
+    Some(now < number(battery, "constant_charge_voltage_max")?)
 }
 
 /// Turns battery protect on or off, at once and kept across restarts. The user must be in
@@ -120,12 +125,7 @@ pub fn set_protect(on: bool) -> io::Result<()> {
 /// itself changes in the kernel, which inotify doesn't see: read it again every few seconds.
 pub fn watch() -> Option<Watch> {
     let (battery, _) = platform::BATTERY?;
-    let files = [
-        "charge_control_end_threshold",
-        "charge_control_start_threshold",
-    ]
-    .map(|f| format!("{battery}/{f}"));
-    Watch::new(&files)
+    Watch::new(&[format!("{battery}/constant_charge_voltage")])
 }
 
 #[cfg(test)]

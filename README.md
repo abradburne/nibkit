@@ -25,7 +25,7 @@ nibkit = { path = "../nibos/sdk/nibkit" }                                       
 | `input` | `printed(sdl_face)`: SDL names face buttons by position on an Xbox pad, the DS+ has Nintendo's labels. The gamepad's name, mapping files to load (stock OS), Menu arriving on release (nibOS), Back's keycodes. |
 | `touch` | `Panel::open()`, `poll()`: the touch panel from evdev, one finger, 0..1 on the bottom screen. |
 | `backlight` | `get(Screen)`, `set(Screen, percent)`, `save()`, `set_off(Screen, bool)`, `watch()` (changes made by the shortcut, `nib` or other apps): each screen's brightness above nibOS's floor, with its perceptual curve. `None` on the stock OS. |
-| `battery` | `read()` (charge, state, plugged in, `time_to_full()`), `protect()`, `set_protect(bool)`, `watch()`: the battery by the RK817's count, and battery protect (stop charging at 80%). `None` on the stock OS. |
+| `battery` | `read()` (charge, state, plugged in, `time_to_full()`), `protect()`, `set_protect(bool)`, `watch()`: the battery by the RK817's count, and battery protect (stop charging at about 80%, by a lower charge voltage). `None` on the stock OS. |
 | `device` | `volume()`, `set_volume()` (PipeWire, through `pactl`), `wifi()`, `set_wifi()` (`nib net`), `sleep()`, `restart()`, `power_off()`. |
 | `power` | The power menu's request (SIGUSR1 on a long press of power, nibOS): `watch()`, then `take()` once a frame. **A program DSlot starts saves its auto-resume state and exits on SIGTERM**: that is how a game is put away for the menu. |
 | `audio` | `ADVICE`: the sample rate and buffer size that suit the sound server: PipeWire at 48 kHz on nibOS; on the stock OS PulseAudio behind an ALSA shim that wants big buffers. |

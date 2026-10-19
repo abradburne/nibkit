@@ -394,6 +394,18 @@ impl Emulators {
         )
     }
 
+    /// Descriptions given as `(id, text)`, as if everything they name were installed: to see
+    /// how DSlot would choose among them.
+    pub fn assume_installed(texts: impl IntoIterator<Item = (String, String)>) -> Emulators {
+        Emulators::from_texts(
+            texts,
+            &Probe {
+                program: |_| true,
+                file: |_| true,
+            },
+        )
+    }
+
     fn from_texts(texts: impl IntoIterator<Item = (String, String)>, there: &Probe) -> Emulators {
         let mut all = Vec::new();
         for (id, text) in texts {
@@ -424,6 +436,22 @@ impl Emulators {
             .filter(|e| e.plays(system))
             .or_else(|| self.all.iter().find(|e| e.plays(system)))
     }
+}
+
+/// Checks a description as DSlot reads it, as if everything it names were installed: for an
+/// emulator's package, before it ships it.
+///
+/// ```
+/// let text = "name = \"inkdot\"\n[systems]\nGB = [\"/usr/bin/inkdot\", \"{rom}\"]\n";
+/// let inkdot = nibkit::dslot::check("inkdot", text).unwrap();
+/// assert!(inkdot.plays("GB") && !inkdot.plays("GBA"));
+/// ```
+pub fn check(id: &str, text: &str) -> Result<Emulator, String> {
+    let all_there = Probe {
+        program: |_| true,
+        file: |_| true,
+    };
+    Emulator::parse(id, text, &all_there)?.ok_or_else(|| format!("{id}: plays no system"))
 }
 
 /// How to tell whether what a description names is there; tests stand in their own.

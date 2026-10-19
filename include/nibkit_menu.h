@@ -106,6 +106,22 @@ NibEffect nib_menu_touch(NibMenu *m, float x, float y);
  * call on `m`. */
 const uint8_t *nib_menu_render(NibMenu *m, int *width, int *height);
 
+/* The top screen while the menu is open, in the same kind of buffer as nib_menu_render.
+ *
+ * Paused: `game` (RGBA, any size, rows top first; NULL for none) scaled by nearest pixel to fill
+ * the screen keeping its shape, dimmed, with `title` ("Paused") large and `subtitle` (the game's
+ * name and time today) under it. */
+const uint8_t *nib_top_paused(NibMenu *m, const uint8_t *game, int gw, int gh,
+                              const char *title, const char *subtitle, int *width, int *height);
+
+/* On a shelf of save states: the highlighted one's `picture` large (NULL for an empty slot), its
+ * `name` ("Slot 2") beside it, `under` that ("Quick slot", or NULL), then `n` lines of
+ * `labels[i]` and `values[i]` ("Saved", "Today 4:41 PM"). */
+const uint8_t *nib_top_state(NibMenu *m, const uint8_t *picture, int pw, int ph,
+                             const char *name, const char *under,
+                             const char *const *labels, const char *const *values, int n,
+                             int *width, int *height);
+
 #ifdef __cplusplus
 }
 #endif

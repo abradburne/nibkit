@@ -2,7 +2,7 @@
 //! time, answering the buttons and touches, drawn into an RGBA picture.
 
 use nibkit::menu::raster::{Canvas, Fonts};
-use nibkit::menu::{layout, Card, Effect, Key, Menu, Row, Shelf, Slot, Status, Value};
+use nibkit::menu::{layout, top, Card, Draw, Effect, Key, Menu, Row, Shelf, Slot, Status, Value};
 use std::ffi::{c_char, c_float, c_int, CStr};
 
 /// A menu's state, behind the C header's opaque `NibMenu`.
@@ -13,6 +13,8 @@ pub struct NibMenu {
     status: Status,
     fonts: Fonts,
     canvas: Canvas,
+    /// The top screen's picture, while the menu is open.
+    top: Canvas,
 }
 
 /// `NibEffect`.
@@ -121,6 +123,7 @@ pub extern "C" fn nib_menu_new() -> *mut NibMenu {
         status: Status::default(),
         fonts: Fonts::new(),
         canvas: Canvas::new(1.0),
+        top: Canvas::new(1.0),
     }))
 }
 
@@ -402,6 +405,131 @@ pub unsafe extern "C" fn nib_menu_render(
     m.canvas.px.as_ptr()
 }
 
+/// A picture handed over from C, if it is there: its bytes, width and height.
+///
+/// # Safety
+/// `rgba` is NULL or `w` × `h` × 4 bytes.
+unsafe fn picture<'a>(rgba: *const u8, w: c_int, h: c_int) -> Option<(&'a [u8], usize, usize)> {
+    let (w, h) = (w.max(0) as usize, h.max(0) as usize);
+    // SAFETY: the caller's promise.
+    (!rgba.is_null() && w > 0 && h > 0)
+        .then(|| (unsafe { std::slice::from_raw_parts(rgba, w * h * 4) }, w, h))
+}
+
+fn size_out(c: &Canvas, width: *mut c_int, height: *mut c_int) {
+    // SAFETY: the callers pass on their callers' promise that these are NULL or writable.
+    unsafe {
+        if let Some(w) = width.as_mut() {
+            *w = c.w as c_int;
+        }
+        if let Some(h) = height.as_mut() {
+            *h = c.h as c_int;
+        }
+    }
+}
+
+/// The paused top screen: `game` scaled (nearest pixel, keeping its shape) to fill the screen,
+/// dimmed, with `title` large and `subtitle` under it.
+///
+/// # Safety
+/// `m` is a live `NibMenu`; `game` is NULL or `gw` × `gh` × 4 bytes; the strings are NULL or
+/// NUL-terminated; `width` and `height` are NULL or writable. The result stays valid until the
+/// next call on `m`.
+#[no_mangle]
+pub unsafe extern "C" fn nib_top_paused(
+    m: *mut NibMenu,
+    game: *const u8,
+    gw: c_int,
+    gh: c_int,
+    title: *const c_char,
+    subtitle: *const c_char,
+    width: *mut c_int,
+    height: *mut c_int,
+) -> *const u8 {
+    // SAFETY: the caller's promises, passed on.
+    let (Some(m), game, title, subtitle) = (
+        unsafe { m.as_mut() },
+        unsafe { picture(game, gw, gh) },
+        unsafe { text(title) },
+        unsafe { text(subtitle) },
+    ) else {
+        return std::ptr::null();
+    };
+    let c = &mut m.top;
+    c.clear(nibkit::menu::colour::BLACK);
+    if let Some((px, w, h)) = game {
+        let k = (nibkit::menu::W / w as f32).min(nibkit::menu::H / h as f32);
+        let (dw, dh) = (w as f32 * k, h as f32 * k);
+        let place = Draw::Picture {
+            index: 0,
+            x: (nibkit::menu::W - dw) / 2.0,
+            y: (nibkit::menu::H - dh) / 2.0,
+            w: dw,
+            h: dh,
+            faded: false,
+        };
+        c.draw(&m.fonts, &[place], |_| Some((px, w, h)));
+        for p in c.px.chunks_exact_mut(4) {
+            for v in &mut p[..3] {
+                *v = (*v as f32 * top::DIM) as u8;
+            }
+        }
+    }
+    c.draw(&m.fonts, &top::paused(&title, &subtitle), |_| None);
+    size_out(c, width, height);
+    c.px.as_ptr()
+}
+
+/// The top screen on a shelf of save states: the highlighted one's `picture` large (NULL for an
+/// empty slot), its `name` beside it, `under` that ("Quick slot", or NULL), then `n` lines of
+/// `labels[i]` and `values[i]` ("Saved", "Today 4:41 PM").
+///
+/// # Safety
+/// As `nib_top_paused`; `labels` and `values` are NULL or hold `n` strings each.
+#[no_mangle]
+pub unsafe extern "C" fn nib_top_state(
+    m: *mut NibMenu,
+    picture_rgba: *const u8,
+    pw: c_int,
+    ph: c_int,
+    name: *const c_char,
+    under: *const c_char,
+    labels: *const *const c_char,
+    values: *const *const c_char,
+    n: c_int,
+    width: *mut c_int,
+    height: *mut c_int,
+) -> *const u8 {
+    // SAFETY: the caller's promises, passed on.
+    let Some(m) = (unsafe { m.as_mut() }) else {
+        return std::ptr::null();
+    };
+    // SAFETY: as above.
+    let (pic, name, under) = unsafe { (picture(picture_rgba, pw, ph), text(name), text(under)) };
+    let n = if labels.is_null() || values.is_null() {
+        0
+    } else {
+        n.max(0) as usize
+    };
+    // SAFETY: the caller's promise that each array holds n strings.
+    let lines: Vec<(String, String)> = (0..n)
+        .map(|i| unsafe { (text(*labels.add(i)), text(*values.add(i))) })
+        .collect();
+    let lines: Vec<(&str, &str)> = lines
+        .iter()
+        .map(|(l, v)| (l.as_str(), v.as_str()))
+        .collect();
+    let c = &mut m.top;
+    c.clear(nibkit::menu::colour::BLACK);
+    c.draw(
+        &m.fonts,
+        &top::state(&name, &under, &lines, pic.map(|_| 0)),
+        |_| pic,
+    );
+    size_out(c, width, height);
+    c.px.as_ptr()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -461,6 +589,64 @@ mod tests {
                 &nibkit::menu::colour::WHITE,
                 "the selected tab"
             );
+            nib_menu_free(m);
+        }
+    }
+
+    #[test]
+    fn the_top_screens_through_the_c_calls() {
+        let m = nib_menu_new();
+        let game = vec![255u8; 256 * 192 * 4];
+        let (mut w, mut h) = (0, 0);
+        unsafe {
+            let px = nib_top_paused(
+                m,
+                game.as_ptr(),
+                256,
+                192,
+                c("Paused").as_ptr(),
+                c("Mole Patrol").as_ptr(),
+                &mut w,
+                &mut h,
+            );
+            let px = std::slice::from_raw_parts(px, (w * h * 4) as usize);
+            assert_eq!((w, h), (1024, 768));
+            // A DS screen fills it, dimmed: white shows as 45% grey away from the words.
+            assert_eq!(px[(700 * 1024 + 20) * 4], (255.0 * top::DIM) as u8);
+            let labels = [c("Saved"), c("Played")];
+            let values = [c("Today 4:41 PM"), c("1 h 23 min")];
+            let lp: Vec<_> = labels.iter().map(|s| s.as_ptr()).collect();
+            let vp: Vec<_> = values.iter().map(|s| s.as_ptr()).collect();
+            let shot = vec![90u8; 160 * 144 * 4];
+            let px = nib_top_state(
+                m,
+                shot.as_ptr(),
+                160,
+                144,
+                c("Slot 2").as_ptr(),
+                c("Quick slot").as_ptr(),
+                lp.as_ptr(),
+                vp.as_ptr(),
+                2,
+                &mut w,
+                &mut h,
+            );
+            let px = std::slice::from_raw_parts(px, (w * h * 4) as usize);
+            assert_eq!(px[(300 * 1024 + 300) * 4], 90, "the picture, large");
+            assert!(!nib_top_state(
+                m,
+                std::ptr::null(),
+                0,
+                0,
+                c("Slot 4").as_ptr(),
+                std::ptr::null(),
+                std::ptr::null(),
+                std::ptr::null(),
+                0,
+                std::ptr::null_mut(),
+                std::ptr::null_mut()
+            )
+            .is_null());
             nib_menu_free(m);
         }
     }

@@ -12,5 +12,7 @@
 - `backlight::step`: a 5% step that lands on multiples of 5 (39 goes to 40 or 35).
 - `device::watch_volume`: the default output's volume changed by anyone, from PipeWire's change
   events (`pactl subscribe`).
+- `input::Repeat`: a held button repeating (first after a delay, then steadily, faster once
+  held 1.5 s), never storing up repeats it couldn't keep up with.
 - `clock`: a 12-hour or 24-hour clock for every app (`~/.config/nibos/prefs.toml`, else the
   locale's habit), and the time formatted that way.

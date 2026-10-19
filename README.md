@@ -24,7 +24,7 @@ nibkit = { path = "../nibos/sdk/nibkit" }                                       
 | `vblank` | `Vblank::open()?.wait(Screen::Top)`: the panel's next vertical blank, and when it was (DRM WAIT_VBLANK, no DRM master needed, so it works beside SDL). |
 | `input` | `printed(sdl_face)`: SDL names face buttons by position on an Xbox pad, the DS+ has Nintendo's labels. The gamepad's name, mapping files to load (stock OS), Menu arriving on release (nibOS), Back's keycodes. |
 | `touch` | `Panel::open()`, `poll()`: the touch panel from evdev, one finger, 0..1 on the bottom screen. |
-| `backlight` | `get(Screen)`, `set(Screen, percent)`, `save()`: each screen's brightness above nibOS's floor, with its perceptual curve. `None` on the stock OS. |
+| `backlight` | `get(Screen)`, `set(Screen, percent)`, `save()`, `set_off(Screen, bool)`, `watch()` (changes made by the shortcut, `nib` or other apps): each screen's brightness above nibOS's floor, with its perceptual curve. `None` on the stock OS. |
 | `device` | `volume()`, `set_volume()` (PipeWire, through `pactl`), `wifi()`, `set_wifi()` (`nib net`), `sleep()`, `restart()`, `power_off()`. |
 | `power` | The power menu's request (SIGUSR1 on a long press of power, nibOS): `watch()`, then `take()` once a frame. **A program DSlot starts saves its auto-resume state and exits on SIGTERM**: that is how a game is put away for the menu. |
 | `audio` | `ADVICE`: the sample rate and buffer size that suit the sound server: PipeWire at 48 kHz on nibOS; on the stock OS PulseAudio behind an ALSA shim that wants big buffers. |
@@ -40,6 +40,7 @@ remembered in the app's settings.
 
 ```sh
 cargo run --example hello                                         # nibOS, or a desktop
+cargo run --example brightness                                    # nibOS: brightness as it changes
 cargo run --example hello --no-default-features --features stock  # built for the stock OS
 ```
 

@@ -12,6 +12,22 @@
 //! backlight::set_off(Screen::Bottom, true);  // the screen dark, its level kept
 //! backlight::set_off(Screen::Bottom, false); // and lit again, before the app exits
 //! ```
+//!
+//! The kernel's level is the one source of truth: the Menu + volume shortcut, `nib brightness`
+//! and every app write it, and nibOS saves it. An app that shows brightness notices changes
+//! made elsewhere with [`watch`], and reads the levels again:
+//!
+//! ```no_run
+//! # use nibkit::{backlight, screens::Screen};
+//! let mut changes = backlight::watch();
+//! loop {
+//!     // Once a frame: one read, which doesn't wait.
+//!     if changes.as_mut().is_some_and(|w| w.changed()) {
+//!         let (_top, _bottom) = (backlight::get(Screen::Top), backlight::get(Screen::Bottom));
+//!     }
+//!     # break;
+//! }
+//! ```
 
 use crate::platform;
 use crate::screens::Screen;
@@ -36,6 +52,76 @@ pub fn set(screen: Screen, percent: u8) {
 pub fn set_off(screen: Screen, off: bool) {
     if let Some(backlight) = Backlight::open(screen) {
         backlight.set_power(off);
+    }
+}
+
+/// Watches both screens' brightness and backlight power for changes by anyone (the shortcut,
+/// `nib`, another app, this one); `None` where this system doesn't let apps have brightness.
+pub fn watch() -> Option<Watch> {
+    let (top, bottom) = platform::BACKLIGHTS?;
+    Watch::new(&[top, bottom])
+}
+
+/// Brightness changes, seen as inotify `IN_MODIFY` on each screen's `brightness` and
+/// `bl_power` (the kernel raises it for every write to them). For a poll loop, its descriptor
+/// becomes readable on a change.
+pub struct Watch {
+    #[cfg(target_os = "linux")]
+    fd: std::os::fd::OwnedFd,
+}
+
+impl Watch {
+    #[cfg(target_os = "linux")]
+    fn new(dirs: &[&str]) -> Option<Watch> {
+        use std::os::fd::{AsRawFd, FromRawFd};
+        // SAFETY: no pointers; a new descriptor, owned from here on.
+        let fd = unsafe { libc::inotify_init1(libc::IN_NONBLOCK | libc::IN_CLOEXEC) };
+        if fd < 0 {
+            return None;
+        }
+        let fd = unsafe { std::os::fd::OwnedFd::from_raw_fd(fd) };
+        let mut watched = 0;
+        for dir in dirs {
+            for file in ["brightness", "bl_power"] {
+                let path = std::ffi::CString::new(format!("{dir}/{file}")).ok()?;
+                // SAFETY: a NUL-terminated path.
+                let wd = unsafe {
+                    libc::inotify_add_watch(fd.as_raw_fd(), path.as_ptr(), libc::IN_MODIFY)
+                };
+                watched += usize::from(wd >= 0);
+            }
+        }
+        (watched > 0).then_some(Watch { fd })
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn new(_dirs: &[&str]) -> Option<Watch> {
+        None
+    }
+
+    /// Whether anything changed since the last call. Never waits.
+    pub fn changed(&mut self) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::fd::AsRawFd;
+            let mut buf = [0u8; 1024];
+            let mut any = false;
+            // SAFETY: reads into a buffer of the length given.
+            while unsafe { libc::read(self.fd.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len()) } > 0
+            {
+                any = true;
+            }
+            any
+        }
+        #[cfg(not(target_os = "linux"))]
+        false
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl std::os::fd::AsRawFd for Watch {
+    fn as_raw_fd(&self) -> std::os::fd::RawFd {
+        self.fd.as_raw_fd()
     }
 }
 
@@ -168,6 +254,24 @@ mod tests {
         assert_eq!(to_level(50, 1, 255, false), 1 + 64);
         assert_eq!(to_percent(65, 1, 255, false), 50);
         assert_eq!(floor(10, 2), 1);
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn watch_sees_writes() {
+        let dir = crate::testing::TempDir::new("watch");
+        let screen = dir.path().join("top");
+        std::fs::create_dir(&screen).unwrap();
+        std::fs::write(screen.join("brightness"), "100").unwrap();
+        std::fs::write(screen.join("bl_power"), "0").unwrap();
+        let mut w = Watch::new(&[screen.to_str().unwrap()]).unwrap();
+        assert!(!w.changed());
+        std::fs::write(screen.join("brightness"), "200").unwrap();
+        assert!(w.changed());
+        assert!(!w.changed(), "once per change");
+        std::fs::write(screen.join("bl_power"), "4").unwrap();
+        assert!(w.changed());
+        assert!(Watch::new(&["/nonexistent"]).is_none());
     }
 
     #[test]

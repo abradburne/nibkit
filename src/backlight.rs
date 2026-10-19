@@ -64,6 +64,48 @@ pub fn watch() -> Option<Watch> {
     Watch::new(files.as_flattened())
 }
 
+/// Both screens dimmed for a while (a screensaver): to `percent`, or left as they are where
+/// already lower. Their levels as they were are kept, exactly as the kernel had them, and put
+/// back by [`Dimmed::restore`] or when it is dropped. Nothing is saved, so nibOS's saved levels
+/// stay the user's. `None` where this system doesn't let apps have brightness.
+pub fn dim(percent: u8) -> Option<Dimmed> {
+    let mut kept = Vec::new();
+    for screen in [Screen::Top, Screen::Bottom] {
+        let Some(backlight) = Backlight::open(screen) else {
+            continue;
+        };
+        let file = backlight.dir.join("brightness");
+        let Ok(level) = std::fs::read_to_string(&file) else {
+            continue;
+        };
+        if backlight.percent().is_some_and(|now| now > percent) {
+            backlight.set_percent(percent);
+        }
+        kept.push((file, level.trim().to_owned()));
+    }
+    (!kept.is_empty()).then_some(Dimmed { kept })
+}
+
+/// Screens dimmed by [`dim`], and the levels to put back.
+pub struct Dimmed {
+    kept: Vec<(PathBuf, String)>,
+}
+
+impl Dimmed {
+    /// Puts the levels back as they were.
+    pub fn restore(self) {}
+}
+
+impl Drop for Dimmed {
+    fn drop(&mut self) {
+        for (file, level) in &self.kept {
+            if let Err(e) = std::fs::write(file, level) {
+                eprintln!("nibkit: {}: {e}", file.display());
+            }
+        }
+    }
+}
+
 /// Keeps the levels as they are now across an unclean power-off (nibOS saves them at shutdown
 /// anyway). Call it when the user lets go of a slider, not on every step. Runs in the
 /// background.

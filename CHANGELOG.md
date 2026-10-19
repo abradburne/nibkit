@@ -7,3 +7,5 @@
   layered settings (system / console / game), and DSlot's description files (feature
   `dslot`). nibOS and the stock OS as features.
 - `power`: the power menu's request (SIGUSR1); `device::sleep`, `restart`, `can_sleep`.
+- `backlight::dim`: both screens dimmed for a while, their levels put back exactly (and not
+  saved) when it is dropped: for a screensaver.

@@ -52,6 +52,29 @@ pub fn set_wifi(on: bool) {
     }
 }
 
+/// Whether [`sleep`] can work here.
+pub fn can_sleep() -> bool {
+    platform::SLEEP.is_some()
+}
+
+/// Sleeps (suspends to RAM), returning once the device has woken up. `false` where this
+/// system doesn't let an app do it.
+pub fn sleep() -> bool {
+    match platform::SLEEP {
+        Some(command) if crate::on_device() => run(Command::new(command[0]).args(&command[1..])),
+        _ => false,
+    }
+}
+
+/// Restarts the device. Only on the device itself.
+pub fn restart() {
+    if crate::on_device() {
+        let _ = Command::new("sync").status();
+        let command = platform::RESTART;
+        run(Command::new(command[0]).args(&command[1..]));
+    }
+}
+
 /// Powers the device off, as the system does it. Only on the device itself.
 pub fn power_off() {
     if crate::on_device() {
@@ -61,15 +84,21 @@ pub fn power_off() {
     }
 }
 
-/// Runs a command, logging its failure.
-fn run(command: &mut Command) {
+/// Runs a command, logging its failure. Returns whether it worked.
+fn run(command: &mut Command) -> bool {
     match command.output() {
-        Ok(out) if out.status.success() => {}
-        Ok(out) => eprintln!(
-            "nibkit: {command:?}: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
-        ),
-        Err(e) => eprintln!("nibkit: {command:?}: {e}"),
+        Ok(out) if out.status.success() => true,
+        Ok(out) => {
+            eprintln!(
+                "nibkit: {command:?}: {}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            );
+            false
+        }
+        Err(e) => {
+            eprintln!("nibkit: {command:?}: {e}");
+            false
+        }
     }
 }
 

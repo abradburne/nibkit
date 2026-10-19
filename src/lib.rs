@@ -9,7 +9,8 @@
 //! | [`input`] | The buttons by what is printed on them, the gamepad's name, the Menu and Back keys. |
 //! | [`touch`] | The touch panel, read straight from evdev. |
 //! | [`backlight`] | Each screen's brightness, in percent. |
-//! | [`device`] | Volume, Wi-Fi, powering off. |
+//! | [`device`] | Volume, Wi-Fi, sleeping, restarting, powering off. |
+//! | [`power`] | The power menu's request (a long press of power on nibOS), and what a game does when it is put away for it. |
 //! | [`audio`] | The sample rate and buffer size that suit the system's sound server. |
 //! | [`paths`] | Where an app keeps its settings, data and cache; where games and saves are. |
 //! | [`settings`] | Settings at three levels, system, console and game, each overriding the one before. |
@@ -33,6 +34,7 @@ pub mod dslot;
 pub mod input;
 pub mod paths;
 mod platform;
+pub mod power;
 pub mod screens;
 pub mod settings;
 pub mod touch;

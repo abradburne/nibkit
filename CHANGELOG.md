@@ -6,3 +6,4 @@
   labels, the touch panel, per-screen brightness, volume and Wi-Fi, audio advice, app folders,
   layered settings (system / console / game), and DSlot's description files (feature
   `dslot`). nibOS and the stock OS as features.
+- `power`: the power menu's request (SIGUSR1); `device::sleep`, `restart`, `can_sleep`.

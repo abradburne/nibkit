@@ -56,3 +56,6 @@ pub const VOLUME: bool = true;
 /// `nib net up|down|status`.
 pub const NETWORK: Option<&str> = Some("nib");
 pub const POWER_OFF: &[&str] = &["systemctl", "poweroff"];
+pub const RESTART: &[&str] = &["systemctl", "reboot"];
+/// logind's suspend: returns once the device is awake again.
+pub const SLEEP: Option<&[&str]> = Some(&["systemctl", "suspend"]);

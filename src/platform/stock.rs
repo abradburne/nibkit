@@ -56,3 +56,6 @@ pub const VOLUME: bool = false;
 pub const NETWORK: Option<&str> = None;
 /// As the stock menu does it.
 pub const POWER_OFF: &[&str] = &["poweroff"];
+pub const RESTART: &[&str] = &["reboot"];
+/// The stock OS sleeps through its own helper, on the power key.
+pub const SLEEP: Option<&[&str]> = None;

@@ -54,6 +54,10 @@ pub const BACKLIGHTS: Option<(&str, &str)> =
 pub const BOARD_CONF: &str = "/usr/lib/nibos/board.conf";
 /// Saves the screens' brightness for the next boot.
 pub const BACKLIGHT_SAVE: Option<&[&str]> = Some(&["nibos-backlight", "save"]);
+/// The battery and charger as nibos-hw names them: links to their power supplies.
+pub const BATTERY: Option<(&str, &str)> = Some(("/run/nibos/battery", "/run/nibos/charger"));
+/// Turns battery protect on or off and keeps it (`nib battery protect on|off`).
+pub const BATTERY_PROTECT: Option<&[&str]> = Some(&["nib", "battery", "protect"]);
 /// The volume: PipeWire's PulseAudio server, through pactl.
 pub const VOLUME: bool = true;
 /// `nib net up|down|status`.

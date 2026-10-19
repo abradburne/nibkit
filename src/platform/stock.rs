@@ -55,6 +55,8 @@ pub const SAVES_ROOT: &str = "/mnt/mmc/Saves";
 pub const BACKLIGHTS: Option<(&str, &str)> = None;
 pub const BOARD_CONF: &str = "";
 pub const BACKLIGHT_SAVE: Option<&[&str]> = None;
+pub const BATTERY: Option<(&str, &str)> = None;
+pub const BATTERY_PROTECT: Option<&[&str]> = None;
 pub const VOLUME: bool = false;
 pub const NETWORK: Option<&str> = None;
 /// As the stock menu does it.

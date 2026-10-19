@@ -9,11 +9,13 @@
 //! | [`input`] | The buttons by what is printed on them, the gamepad's name, the Menu and Back keys. |
 //! | [`touch`] | The touch panel, read straight from evdev. |
 //! | [`backlight`] | Each screen's brightness, in percent. |
+//! | [`battery`] | The battery's charge, time to full, and battery protect (stop at 80%). |
 //! | [`device`] | Volume, Wi-Fi, sleeping, restarting, powering off. |
 //! | [`power`] | The power menu's request (a long press of power on nibOS), and what a game does when it is put away for it. |
 //! | [`audio`] | The sample rate and buffer size that suit the system's sound server. |
 //! | [`paths`] | Where an app keeps its settings, data and cache; where games and saves are. |
 //! | [`settings`] | Settings at three levels, system, console and game, each overriding the one before. |
+//! | [`watch`] | Noticing that a setting changed elsewhere, without waiting. |
 //! | `dslot` (feature `dslot`) | Description files, for an emulator or app that DSlot starts. |
 //!
 //! The same code runs on two systems, chosen when the app is built: **nibOS** (feature
@@ -28,6 +30,7 @@ compile_error!("nibkit: build for a system: feature `nibos` (the default) or `st
 
 pub mod audio;
 pub mod backlight;
+pub mod battery;
 pub mod device;
 #[cfg(feature = "dslot")]
 pub mod dslot;
@@ -39,6 +42,7 @@ pub mod screens;
 pub mod settings;
 pub mod touch;
 pub mod vblank;
+pub mod watch;
 
 #[cfg(test)]
 mod testing;

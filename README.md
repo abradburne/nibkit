@@ -16,5 +16,5 @@ c++ -I include app.cpp target/release/libnibkit_menu.a -lpthread -ldl -lm
 ```
 
 Built for nibOS by default; `--no-default-features --features stock` for the stock OS. The
-layout, colours, face (Roboto Condensed, Apache-2.0) and button rules are nibkit's: see its
+layout, colours, face (Roboto Condensed, SIL OFL 1.1: the library embeds it, so ship [OFL.txt](OFL.txt) with it) and button rules are nibkit's: see its
 `menu` module.

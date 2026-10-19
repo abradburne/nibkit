@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.87"
 description = "nibkit for C and C++ apps: DSlot's menu for the touch screen, DSlot's settings and an emulator's declared options, brightness, clock, battery and volume: a static library and include/nibkit_menu.h"
-license = "MIT"
+# MIT, and nibkit's fonts, which the library embeds, under the SIL OFL 1.1 (OFL.txt).
+license = "MIT AND OFL-1.1"
 repository = "https://github.com/abradburne/nibos"
 
 [lib]

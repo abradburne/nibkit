@@ -21,8 +21,11 @@
 //! An emulator with a menu of its own can keep the options it declares in DSlot's settings
 //! ([`settings_file`]), so the two menus show the same values: under its id, at the console's
 //! or the game's level (`[console.GB.inkdot]`, `[game."GB/Tetris (World)".inkdot]`), with
-//! [`crate::settings::Settings`]. DSlot reads the file again when a game exits. Read it when
+//! [`crate::settings::Settings`]; never at the system level, which DSlot doesn't read options
+//! at. A reset removes the key (`Settings::reset`): unset everywhere, the option isn't passed
+//! and the emulator's `default` holds. DSlot reads the file again when a game exits. Read it when
 //! the game starts and write it when an option changes; DSlot does not touch it meanwhile.
+//! What an emulator doesn't declare stays in its own files.
 
 mod apps;
 mod launch;

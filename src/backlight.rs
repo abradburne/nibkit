@@ -40,6 +40,22 @@ pub fn get(screen: Screen) -> Option<u8> {
     Backlight::open(screen)?.percent()
 }
 
+/// How far one step of brightness goes, in percent; steps land on its multiples.
+pub const STEP: u8 = 5;
+
+/// The brightness one step up (`dir` > 0) or down from `from`, in percent: the next multiple
+/// of [`STEP`] that way, so a step from 39 goes to 40 or 35, and from 40 to 45 or 35. Held
+/// between 0 (nibOS's floor, never dark) and 100. What a slider or a shortcut sets.
+pub fn step(from: u8, dir: i32) -> u8 {
+    let from = from.min(100);
+    let next = match dir.signum() {
+        1 => (from / STEP + 1) * STEP,
+        -1 => from.div_ceil(STEP).saturating_sub(1) * STEP,
+        _ => from,
+    };
+    next.min(100)
+}
+
 /// Sets the screen's brightness, in percent: at once, as a slider moves.
 pub fn set(screen: Screen, percent: u8) {
     if let Some(backlight) = Backlight::open(screen) {
@@ -235,6 +251,24 @@ mod tests {
         assert_eq!(to_level(50, 1, 255, false), 1 + 64);
         assert_eq!(to_percent(65, 1, 255, false), 50);
         assert_eq!(floor(10, 2), 1);
+    }
+
+    #[test]
+    fn steps() {
+        assert_eq!((step(39, 1), step(39, -1)), (40, 35));
+        assert_eq!((step(40, 1), step(40, -1)), (45, 35));
+        assert_eq!((step(44, 1), step(44, -1)), (45, 40));
+        assert_eq!((step(0, -1), step(3, -1), step(5, -1)), (0, 0, 0));
+        assert_eq!((step(98, 1), step(100, 1), step(100, -1)), (100, 100, 95));
+        assert_eq!(step(37, 0), 37);
+        // Every step lands on a multiple, and steps back to where it came from.
+        for p in (0..=100).step_by(5) {
+            let up = step(p, 1);
+            assert_eq!(up % STEP, 0);
+            if p < 100 {
+                assert_eq!(step(up, -1), p);
+            }
+        }
     }
 
     #[test]

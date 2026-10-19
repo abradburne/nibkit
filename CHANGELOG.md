@@ -10,3 +10,5 @@
 - `backlight::dim`: both screens dimmed for a while, their levels put back exactly (and not
   saved) when it is dropped: for a screensaver.
 - `backlight::step`: a 5% step that lands on multiples of 5 (39 goes to 40 or 35).
+- `device::watch_volume`: the default output's volume changed by anyone, from PipeWire's change
+  events (`pactl subscribe`).

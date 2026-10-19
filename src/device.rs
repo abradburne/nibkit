@@ -18,6 +18,90 @@ pub fn volume() -> Option<u8> {
     parse_volume(&String::from_utf8_lossy(&out.stdout))
 }
 
+/// Watches the default output's volume for changes by anyone (the volume keys, another app,
+/// this one), through PipeWire's change events (`pactl subscribe`, kept running while it
+/// lives). `None` where the system keeps the volume to itself.
+pub fn watch_volume() -> Option<VolumeWatch> {
+    if !platform::VOLUME {
+        return None;
+    }
+    let mut child = Command::new("pactl")
+        .arg("subscribe")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .ok()?;
+    let out = child.stdout.take()?;
+    #[cfg(unix)]
+    {
+        use std::os::fd::AsRawFd;
+        // SAFETY: fcntl on a descriptor `out` owns.
+        unsafe {
+            let fd = out.as_raw_fd();
+            libc::fcntl(
+                fd,
+                libc::F_SETFL,
+                libc::fcntl(fd, libc::F_GETFL) | libc::O_NONBLOCK,
+            );
+        }
+    }
+    Some(VolumeWatch {
+        child,
+        out,
+        line: String::new(),
+    })
+}
+
+/// Changes to the default output's volume (and to which output that is) since it was last
+/// asked. For a poll loop, its descriptor becomes readable on a change (and on other events,
+/// which [`VolumeWatch::changed`] passes over).
+pub struct VolumeWatch {
+    child: std::process::Child,
+    out: std::process::ChildStdout,
+    /// A line read in part.
+    line: String,
+}
+
+impl VolumeWatch {
+    /// Whether the volume may have changed since the last call. Never waits.
+    pub fn changed(&mut self) -> bool {
+        use std::io::Read;
+        let mut buf = [0u8; 1024];
+        let mut any = false;
+        while let Ok(n @ 1..) = self.out.read(&mut buf) {
+            self.line.push_str(&String::from_utf8_lossy(&buf[..n]));
+            while let Some(end) = self.line.find('\n') {
+                any |= volume_event(&self.line[..end]);
+                self.line.drain(..=end);
+            }
+        }
+        any
+    }
+}
+
+#[cfg(unix)]
+impl std::os::fd::AsRawFd for VolumeWatch {
+    fn as_raw_fd(&self) -> std::os::fd::RawFd {
+        self.out.as_raw_fd()
+    }
+}
+
+impl Drop for VolumeWatch {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+/// Whether a line of `pactl subscribe` may be a volume change: a sink changed (its volume), or
+/// the server (the default sink, as headphones go in). A stream's (`sink-input`) is not.
+fn volume_event(line: &str) -> bool {
+    line.starts_with("Event 'change' on ") && {
+        let what = &line["Event 'change' on ".len()..];
+        what.starts_with("sink #") || what.starts_with("server")
+    }
+}
+
 pub fn set_volume(percent: u8) {
     if platform::VOLUME {
         let level = format!("{}%", percent.min(100));
@@ -105,6 +189,15 @@ fn run(command: &mut Command) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn volume_events() {
+        assert!(volume_event("Event 'change' on sink #52"));
+        assert!(volume_event("Event 'change' on server #4294967295"));
+        assert!(!volume_event("Event 'change' on sink-input #88"));
+        assert!(!volume_event("Event 'new' on sink #52"));
+        assert!(!volume_event("Event 'change' on source #51"));
+    }
 
     #[test]
     fn pactl() {

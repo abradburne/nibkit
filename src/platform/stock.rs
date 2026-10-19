@@ -57,6 +57,7 @@ pub const BOARD_CONF: &str = "";
 pub const BACKLIGHT_SAVE: Option<&[&str]> = None;
 pub const BATTERY: Option<(&str, &str)> = None;
 pub const BATTERY_PROTECT: Option<&[&str]> = None;
+pub const AMP_TUNING: Option<&str> = None;
 pub const VOLUME: bool = false;
 pub const NETWORK: Option<&str> = None;
 /// As the stock menu does it.

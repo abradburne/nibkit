@@ -58,6 +58,8 @@ pub const BACKLIGHT_SAVE: Option<&[&str]> = Some(&["nibos-backlight", "save"]);
 pub const BATTERY: Option<(&str, &str)> = Some(("/run/nibos/battery", "/run/nibos/charger"));
 /// Turns battery protect on or off and keeps it (`nib battery protect on|off`).
 pub const BATTERY_PROTECT: Option<&[&str]> = Some(&["nib", "battery", "protect"]);
+/// The speaker amps' tuning: `nib audio` (sudo -n for changes; the wheel group may).
+pub const AMP_TUNING: Option<&str> = Some("/usr/lib/nibos/nib-audio");
 /// The volume: PipeWire's PulseAudio server, through pactl.
 pub const VOLUME: bool = true;
 /// `nib net up|down|status`.

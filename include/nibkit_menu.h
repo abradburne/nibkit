@@ -1,4 +1,5 @@
-/* nibkit's menu for C and C++: DSlot's menu, for an app's touch screen (1024 x 768).
+/* nibkit for C and C++: DSlot's menu for an app's touch screen (1024 x 768), and what its pages
+ * show: DSlot's settings and an emulator's options, brightness, the clock, the battery, the volume.
  *
  * Fill a page, answer the buttons and touches, draw it:
  *
@@ -121,6 +122,88 @@ const uint8_t *nib_top_state(NibMenu *m, const uint8_t *picture, int pw, int ph,
                              const char *name, const char *under,
                              const char *const *labels, const char *const *values, int n,
                              int *width, int *height);
+
+/* ---- DSlot's settings and an emulator's options -------------------------------------------
+ *
+ * The same file, rows and words as DSlot's own pages (DSlot's docs/emulators.md, "One place for
+ * each option"). Values cross as text: a string as it is, a number in decimal, a toggle "true" or
+ * "false". A scope is "system", a console ("NDS") or a game ("NDS/<ROM name>", the ROM's file
+ * name without its extension). Strings returned are valid until the next call on the same
+ * handle. */
+
+typedef struct NibSettings NibSettings;
+typedef struct NibOptions NibOptions;
+
+/* DSlot's settings file (nibOS); NULL where there is none (the stock OS). */
+NibSettings *nib_settings_open(void);
+NibSettings *nib_settings_open_file(const char *path);
+void nib_settings_free(NibSettings *s);
+/* Reads the file again; writes it (atomically): 0 on success, -1 on failure. */
+void nib_settings_reload(NibSettings *s);
+int nib_settings_save(NibSettings *s);
+/* A key ("dsperate.hires3d") set at a scope exactly, as text; NULL if unset. */
+const char *nib_settings_get(NibSettings *s, const char *scope, const char *key);
+void nib_settings_set_text(NibSettings *s, const char *scope, const char *key, const char *value);
+void nib_settings_set_int(NibSettings *s, const char *scope, const char *key, int64_t value);
+void nib_settings_set_bool(NibSettings *s, const char *scope, const char *key, int value);
+/* Clears a key at a scope, so the level above applies there ("Use ..."). */
+void nib_settings_reset(NibSettings *s, const char *scope, const char *key);
+
+/* Emulator `id`'s ("dsperate") options for `system` ("NDS"), from the descriptions DSlot reads;
+ * or from a description's text. NULL if there is none, or it isn't valid. */
+NibOptions *nib_options_load(const char *id, const char *system);
+NibOptions *nib_options_from_text(const char *id, const char *description, const char *system);
+void nib_options_free(NibOptions *o);
+int nib_options_count(NibOptions *o);
+
+/* Option `i`: its key in the settings file, its label, its kind (0 a choice, 1 a toggle,
+ * 2 a number), a choice's values (`label` 0: the value as text; 1: its label as shown), a
+ * number's range and step (returns its unit; NULL if it isn't a number), its default (NULL: the
+ * emulator's own, not passed). */
+const char *nib_option_key(NibOptions *o, int i);
+const char *nib_option_label(NibOptions *o, int i);
+int nib_option_kind(NibOptions *o, int i);
+int nib_option_choices(NibOptions *o, int i);
+const char *nib_option_choice(NibOptions *o, int i, int j, int label);
+const char *nib_option_range(NibOptions *o, int i, int64_t *min, int64_t *max, int64_t *step);
+const char *nib_option_default(NibOptions *o, int i);
+
+/* A value as its row shows it; the value one step on or back (`dir` +1 or -1) from `from` (NULL:
+ * from the default), round a choice and held at a number's ends. */
+const char *nib_option_show(NibOptions *o, int i, const char *value);
+const char *nib_option_step(NibOptions *o, int i, const char *from, int dir);
+
+/* Option `i`'s value seen from the game's page (`rom`: the ROM's name without its extension) or
+ * the console's (`rom` NULL); NULL when set nowhere and with no default. `*level`: 3 the game,
+ * 2 the console, 1 the system, 0 its default or nowhere. */
+const char *nib_option_value(NibOptions *o, int i, NibSettings *s, const char *rom, int *level);
+/* What its row shows when not set at its page's level: "Use NDS (2x)", "Use default (On)" or
+ * "Use DSperate's own". */
+const char *nib_option_inherit(NibOptions *o, int i, NibSettings *s, const char *rom);
+/* Sets option `i` at `scope` (text, parsed by its kind): 0, or -1 if it isn't one of its
+ * values. Save with nib_settings_save. */
+int nib_option_set(NibOptions *o, int i, NibSettings *s, const char *scope, const char *value);
+/* The command-line words a value adds: how many, then each. */
+int nib_option_words(NibOptions *o, int i, const char *value);
+const char *nib_option_word(NibOptions *o, int j);
+
+/* ---- The System page ------------------------------------------------------------------------
+ *
+ * -1 where the system doesn't let an app have one (the stock OS keeps brightness and volume). */
+
+/* `screen` 0 the top, 1 the bottom; set at once as a slider moves, save when it is let go of. */
+int nib_backlight_get(int screen);
+void nib_backlight_set(int screen, int percent);
+void nib_backlight_save(void);
+/* 12-hour (1) or 24-hour (0), for every app; setting it: 0 on success, -1 on failure. */
+int nib_clock_hour12(void);
+int nib_clock_set_hour12(int on);
+/* The time now as the bar shows it ("17:05", "5:05 PM"); valid until the next call on `m`. */
+const char *nib_menu_clock(NibMenu *m);
+/* The battery's charge in percent and whether it is charging (`charging` may be NULL). */
+int nib_battery(int *charging);
+int nib_volume_get(void);
+void nib_volume_set(int percent);
 
 #ifdef __cplusplus
 }

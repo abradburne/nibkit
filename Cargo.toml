@@ -3,7 +3,7 @@ name = "nibkit-menu-c"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.87"
-description = "nibkit's menu (DSlot's menu, for an app's touch screen) for C and C++ apps: a static library and include/nibkit_menu.h"
+description = "nibkit for C and C++ apps: DSlot's menu for the touch screen, DSlot's settings and an emulator's declared options, brightness, clock, battery and volume: a static library and include/nibkit_menu.h"
 license = "MIT"
 repository = "https://github.com/abradburne/nibos"
 
@@ -18,6 +18,7 @@ nibos = ["nibkit/nibos"]
 stock = ["nibkit/stock"]
 
 [dependencies]
-nibkit = { path = "../nibkit", default-features = false, features = ["menu-raster"] }
+nibkit = { path = "../nibkit", default-features = false, features = ["menu-raster", "dslot"] }
+libc = "0.2"
 
 [workspace]

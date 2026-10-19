@@ -1,5 +1,10 @@
-//! nibkit's menu for C and C++ apps (include/nibkit_menu.h): DSlot's menu, filled in a call at a
-//! time, answering the buttons and touches, drawn into an RGBA picture.
+//! nibkit for C and C++ apps (include/nibkit_menu.h): DSlot's menu, filled in a call at a time,
+//! answering the buttons and touches, drawn into an RGBA picture; and what the menu's pages show:
+//! DSlot's settings and an emulator's declared options (`options`), brightness, the clock, the
+//! battery and the volume (`system`).
+
+mod options;
+mod system;
 
 use nibkit::menu::raster::{Canvas, Fonts};
 use nibkit::menu::{layout, top, Card, Draw, Effect, Key, Menu, Row, Shelf, Slot, Status, Value};
@@ -15,6 +20,8 @@ pub struct NibMenu {
     canvas: Canvas,
     /// The top screen's picture, while the menu is open.
     top: Canvas,
+    /// The last string handed out (the clock).
+    pub(crate) scratch: std::ffi::CString,
 }
 
 /// `NibEffect`.
@@ -83,11 +90,24 @@ fn effect(e: Option<Effect>) -> NibEffect {
     }
 }
 
+/// Keeps `s` in `slot` and hands C a pointer to it, valid until the slot is next written (NULL
+/// for `None`). Any NUL in `s` ends it there.
+pub(crate) fn out(slot: &mut std::ffi::CString, s: Option<String>) -> *const c_char {
+    match s {
+        Some(s) => {
+            let s = s.split('\0').next().unwrap_or("").to_owned();
+            *slot = std::ffi::CString::new(s).unwrap_or_default();
+            slot.as_ptr()
+        }
+        None => std::ptr::null(),
+    }
+}
+
 /// A C string as text: empty for NULL or bad UTF-8 (lossy).
 ///
 /// # Safety
 /// `s` is NULL or points at a NUL-terminated string.
-unsafe fn text(s: *const c_char) -> String {
+pub(crate) unsafe fn text(s: *const c_char) -> String {
     if s.is_null() {
         return String::new();
     }
@@ -124,6 +144,7 @@ pub extern "C" fn nib_menu_new() -> *mut NibMenu {
         fonts: Fonts::new(),
         canvas: Canvas::new(1.0),
         top: Canvas::new(1.0),
+        scratch: std::ffi::CString::default(),
     }))
 }
 

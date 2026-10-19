@@ -1,9 +1,14 @@
 # nibkit-menu-c
 
-nibkit's `menu` (DSlot's menu, for an app's touch screen) for C and C++ apps: a static library
-and its header, `include/nibkit_menu.h`. An emulator written in C++ (DSperate) shows the same
-menu as DSlot and inkdot through it: it fills a page a call at a time, passes on the buttons and
-touches, and draws the RGBA picture it gets back on the bottom screen.
+nibkit for C and C++ apps: a static library and its header, `include/nibkit_menu.h`. An emulator
+written in C++ (DSperate) shows the same menu as DSlot and inkdot through it:
+
+- **The menu** (nibkit's `menu`): it fills a page a call at a time, passes on the buttons and
+  touches, and draws the RGBA picture it gets back on the bottom screen; the top screen while
+  paused, or on a shelf of save states, the same way.
+- **What the pages show:** DSlot's settings file and the emulator's options as its description
+  declares them (values, "Use NDS (2x)", stepping, the command-line words), and the System page's
+  brightness, clock, battery and volume.
 
 ```bash
 cargo build --release                 # target/release/libnibkit_menu.a

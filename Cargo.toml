@@ -1,0 +1,25 @@
+[package]
+name = "nibkit"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.87"
+description = "What an app on a nibOS handheld needs to know and do: both screens, vblank, the buttons' names, touch, brightness, volume, where its files go, layered settings"
+license = "MIT"
+repository = "https://github.com/abradburne/nibos"
+
+# The system the app runs on: one of `nibos` (the default) or `stock` (the RG DS+'s own OS),
+# chosen when the app is built. `dslot` adds what an emulator or app needs to appear in DSlot.
+[features]
+default = ["nibos"]
+nibos = []
+stock = []
+dslot = []
+
+[dependencies]
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+toml = { version = "0.8", default-features = false, features = ["parse", "display"] }
+
+[dev-dependencies]
+# For the example only: nibkit itself uses no graphics library.
+sdl2 = "0.38"

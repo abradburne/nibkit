@@ -1,0 +1,51 @@
+//! nibkit: what an app on a nibOS handheld (the Anbernic RG DS+ today) needs to know and do,
+//! without depending on any one graphics or input library. Use it with SDL (as the template
+//! in `sdk/template` does), or anything else.
+//!
+//! | Module | |
+//! |---|---|
+//! | [`screens`] | The two panels: which SDL display (or which half of one) is the top screen and which the bottom, their size and refresh. |
+//! | [`vblank`] | Waiting for a panel's vertical blank, and when it was. |
+//! | [`input`] | The buttons by what is printed on them, the gamepad's name, the Menu and Back keys. |
+//! | [`touch`] | The touch panel, read straight from evdev. |
+//! | [`backlight`] | Each screen's brightness, in percent. |
+//! | [`device`] | Volume, Wi-Fi, powering off. |
+//! | [`audio`] | The sample rate and buffer size that suit the system's sound server. |
+//! | [`paths`] | Where an app keeps its settings, data and cache; where games and saves are. |
+//! | [`settings`] | Settings at three levels, system, console and game, each overriding the one before. |
+//! | `dslot` (feature `dslot`) | Description files, for an emulator or app that DSlot starts. |
+//!
+//! The same code runs on two systems, chosen when the app is built: **nibOS** (feature
+//! `nibos`, the default) and the RG DS+'s **stock OS** (feature `stock`). Where the stock OS
+//! lacks something nibOS has (each screen's brightness, a volume DSlot can set), the call says
+//! so (`None`) rather than guessing.
+
+#[cfg(all(feature = "nibos", feature = "stock"))]
+compile_error!("nibkit: build for one system, feature `nibos` (the default) or `stock`, not both");
+#[cfg(not(any(feature = "nibos", feature = "stock")))]
+compile_error!("nibkit: build for a system: feature `nibos` (the default) or `stock`");
+
+pub mod audio;
+pub mod backlight;
+pub mod device;
+#[cfg(feature = "dslot")]
+pub mod dslot;
+pub mod input;
+pub mod paths;
+mod platform;
+pub mod screens;
+pub mod settings;
+pub mod touch;
+pub mod vblank;
+
+#[cfg(test)]
+mod testing;
+
+/// The system nibkit was built for: "nibOS" or "stock".
+pub const SYSTEM: &str = platform::NAME;
+
+/// On the handheld itself, as against a desktop where an app is tried out: no X or Wayland
+/// session on nibOS, the stock OS's vendor partition there.
+pub fn on_device() -> bool {
+    platform::on_device()
+}

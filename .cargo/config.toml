@@ -1,0 +1,7 @@
+# Building nibkit itself (its tests and example), not apps that use it: they have their own.
+# The RG DS+'s cores, as in sdk/template; and Homebrew's SDL2 for the example on a Mac.
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "target-cpu=cortex-a55"]
+
+[target.aarch64-apple-darwin]
+rustflags = ["-L", "/opt/homebrew/lib"]

@@ -10,6 +10,8 @@
 //!   1024 × 768 screen in DSlot's sizes and colours ([`colour`]).
 //! - [`Menu::key`], [`Menu::touch`] (and the same on [`Shelf`]) move the highlight with the
 //!   buttons and find what a finger touched, saying what to do as an [`Effect`].
+//! - [`top`] lays out the top screen while the menu is open: the game paused, or a save
+//!   state's picture and details.
 //! - [`raster`] (feature `menu-raster`) draws the [`Draw`]s into an RGBA picture in Roboto
 //!   Condensed, the face DSlot uses, for an app with nothing of its own to draw text with.
 //!
@@ -32,6 +34,7 @@ pub mod layout;
 mod model;
 #[cfg(feature = "menu-raster")]
 pub mod raster;
+pub mod top;
 
 pub use input::{Effect, Key};
 pub use layout::Draw;

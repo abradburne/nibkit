@@ -1,6 +1,6 @@
 //! What an emulator (or an app) tells DSlot about itself, in a description file of its own, and
 //! the conventions DSlot starts it by (docs/emulators.md in DSlot). On nibOS a package installs
-//! its description in /usr/share/dslot/emulators/<id>.toml:
+//! its description in `/usr/share/dslot/emulators/<id>.toml`:
 //!
 //! ```toml
 //! name = "inkdot"
@@ -17,6 +17,12 @@
 //! turns into words of its command line, and actions on a game's files (clear its resume state).
 //!
 //! Systems are named as the `Roms/` folders are: `NDS`, `GBA`, `GB`, `GBC`.
+//!
+//! An emulator with a menu of its own can keep the options it declares in DSlot's settings
+//! ([`settings_file`]), so the two menus show the same values: under its id, at the console's
+//! or the game's level (`[console.GB.inkdot]`, `[game."GB/Tetris (World)".inkdot]`), with
+//! [`crate::settings::Settings`]. DSlot reads the file again when a game exits. Read it when
+//! the game starts and write it when an option changes; DSlot does not touch it meanwhile.
 
 mod apps;
 mod launch;
@@ -30,6 +36,16 @@ use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use toml::Value;
+
+/// DSlot's settings file on nibOS: `~/.config/dslot/settings.toml` (`$XDG_CONFIG_HOME`). On
+/// the stock OS DSlot keeps it beside its program, and there is none for an emulator to use.
+pub fn settings_file() -> Option<PathBuf> {
+    cfg!(feature = "nibos").then(|| {
+        crate::paths::AppDirs::new("dslot")
+            .config
+            .join("settings.toml")
+    })
+}
 
 /// A description file as written.
 #[derive(Deserialize)]

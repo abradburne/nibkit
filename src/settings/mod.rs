@@ -200,12 +200,17 @@ impl Settings {
         )
     }
 
-    /// Writes the settings to their file, making its folder if need be.
+    /// Writes the settings to their file, making its folder if need be. The file is replaced
+    /// whole (written beside it, then renamed), so another program reading it, or this one
+    /// stopped half way, never sees half a file.
     pub fn save(&self) -> std::io::Result<()> {
         if let Some(dir) = self.file.parent() {
             fs::create_dir_all(dir)?;
         }
-        fs::write(&self.file, self.to_toml())
+        let mut new = self.file.clone().into_os_string();
+        new.push(format!(".{}.new", std::process::id()));
+        fs::write(&new, self.to_toml())?;
+        fs::rename(&new, &self.file).inspect_err(|_| drop(fs::remove_file(&new)))
     }
 
     /// The value set at exactly this level.
@@ -323,6 +328,8 @@ mod tests {
         let text = fs::read_to_string(&file).unwrap();
         assert!(text.starts_with("# Settings"));
         assert!(text.contains("[console.NDS.dsperate]"), "{text}");
+        // Nothing left beside it.
+        assert_eq!(fs::read_dir(file.parent().unwrap()).unwrap().count(), 1);
 
         let s = Settings::load(&file);
         assert_eq!(s.state.get("page").and_then(Value::as_str), Some("gba"));

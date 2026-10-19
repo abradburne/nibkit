@@ -24,6 +24,8 @@ pub struct Row {
     pub value: Value,
     /// A heading over the rows that follow it, not a row to highlight: drawn small and faint.
     pub heading: bool,
+    /// A few words beside the value, small and faint ("stops charging at about 80%").
+    pub note: Option<String>,
 }
 
 impl Row {
@@ -32,6 +34,15 @@ impl Row {
             label: label.into(),
             value,
             heading: false,
+            note: None,
+        }
+    }
+
+    /// The row with a note beside its value.
+    pub fn with_note(self, note: impl Into<String>) -> Row {
+        Row {
+            note: Some(note.into()),
+            ..self
         }
     }
 
@@ -41,6 +52,7 @@ impl Row {
             label: label.into(),
             value: Value::None,
             heading: true,
+            note: None,
         }
     }
 }

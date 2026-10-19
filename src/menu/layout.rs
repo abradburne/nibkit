@@ -179,8 +179,21 @@ fn footer(out: &mut Vec<Draw>, hint: &str, status: &Status) {
     ));
 }
 
-/// A page of rows, as DSlot's menu draws one.
+/// A page of rows, as DSlot's menu draws one. A row's note goes left of its value by an
+/// estimate of the value's width; [`menu_measured`] places it exactly.
 pub fn menu(m: &Menu, status: &Status) -> Vec<Draw> {
+    menu_measured(m, status, |s, size, _| {
+        s.chars().count() as f32 * size * 0.45
+    })
+}
+
+/// [`menu`], with `width(text, size, bold)` saying how wide text is drawn, in screen units:
+/// a row's note goes just left of its value.
+pub fn menu_measured(
+    m: &Menu,
+    status: &Status,
+    width: impl Fn(&str, f32, bool) -> f32,
+) -> Vec<Draw> {
     let mut out = Vec::new();
     tabs(&mut out, &m.tabs);
     out.push(text(
@@ -216,8 +229,9 @@ pub fn menu(m: &Menu, status: &Status) -> Vec<Draw> {
         let ink = if lit { colour::WHITE } else { colour::DIM };
         out.push(text(&row.label, (26.0, false), (LEFT, y - 16.0), 0.0, ink));
         let value = (26.0, true);
-        match &row.value {
-            Value::None => {}
+        // How wide the value is drawn, so that its note goes just left of it.
+        let drawn = match &row.value {
+            Value::None => 0.0,
             Value::Text(t) | Value::Inherited(t) => {
                 let ink = match row.value {
                     Value::Inherited(_) => colour::DIM,
@@ -229,19 +243,17 @@ pub fn menu(m: &Menu, status: &Status) -> Vec<Draw> {
                     t.clone()
                 };
                 out.push(text(&t, value, (RIGHT, y - 16.0), 1.0, ink));
+                width(&t, 26.0, true)
             }
             Value::More(t) => {
-                out.push(text(
-                    &format!("{t}   \u{203a}"),
-                    value,
-                    (RIGHT, y - 16.0),
-                    1.0,
-                    colour::WHITE,
-                ));
+                let t = format!("{t}   \u{203a}");
+                out.push(text(&t, value, (RIGHT, y - 16.0), 1.0, colour::WHITE));
+                width(&t, 26.0, true)
             }
             Value::Prompt { text: t, warning } => {
                 let ink = if *warning { colour::RED } else { colour::WHITE };
                 out.push(text(t, value, (RIGHT, y - 16.0), 1.0, ink));
+                width(t, 26.0, true)
             }
             Value::Stars(rating) => {
                 let w = 5.0 * (ICON + 4.0) - 4.0;
@@ -250,6 +262,7 @@ pub fn menu(m: &Menu, status: &Status) -> Vec<Draw> {
                     y: y - ICON / 2.0,
                     rating: *rating,
                 });
+                w
             }
             Value::Slider(percent) => {
                 out.push(text(
@@ -281,7 +294,17 @@ pub fn menu(m: &Menu, status: &Status) -> Vec<Draw> {
                     h: 6.0,
                     colour: colour::WHITE,
                 });
+                gap + bar
             }
+        };
+        if let Some(note) = &row.note {
+            out.push(text(
+                note,
+                (18.0, false),
+                (RIGHT - drawn - 22.0, y - 10.0),
+                1.0,
+                colour::FAINT,
+            ));
         }
     }
     // More rows above or below: an ellipsis (the face has one; it has no arrows).

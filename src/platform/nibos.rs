@@ -6,6 +6,7 @@ use crate::screens::Layout;
 
 pub const NAME: &str = "nibOS";
 /// As apps name it in `runs_on`.
+#[cfg(feature = "dslot")]
 pub const KEY: &str = "nibos";
 
 pub fn on_device() -> bool {

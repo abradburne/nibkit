@@ -8,6 +8,7 @@ use std::path::Path;
 
 pub const NAME: &str = "stock";
 /// As apps name it in `runs_on`.
+#[cfg(feature = "dslot")]
 pub const KEY: &str = "stock";
 
 pub fn on_device() -> bool {

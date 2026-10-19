@@ -107,7 +107,8 @@ impl Def {
     }
 
     /// The value one step from `from` in direction `dir` (wrapping round a list, held at the
-    /// ends of a range). From nothing, the first step lands on the default, or the first value.
+    /// ends of a range). From nothing, it steps from the default; with no default, it lands on
+    /// the first value.
     pub fn step(&self, from: Option<&Value>, dir: i32) -> Value {
         let from = from.or(self.default.as_ref());
         match &self.kind {

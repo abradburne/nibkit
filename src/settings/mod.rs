@@ -45,6 +45,7 @@ use toml::Table;
 /// Where a value is set.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub enum Scope {
+    /// Everything: the device, or the app as a whole.
     System,
     /// A console, by its `Roms/` folder name: `GBC`.
     Console(String),
@@ -218,6 +219,7 @@ impl Settings {
         self.values.get(scope)?.get(key)
     }
 
+    /// Sets `key` to `value` at exactly this level.
     pub fn set(&mut self, scope: Scope, key: &str, value: Value) {
         self.values
             .entry(scope)

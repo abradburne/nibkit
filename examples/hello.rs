@@ -1,14 +1,18 @@
 //! A plain nibOS app on nibkit and SDL2: both screens, the buttons by their labels, touch,
 //! the top screen's brightness, and a setting that is remembered. Nothing to do with DSlot.
 //!
-//!   cargo run --example hello                                    # nibOS (or a desktop)
+//!   cargo run --example hello                                    # nibOS, or a desktop
 //!   cargo run --example hello --no-default-features --features stock
+//!
+//! On a desktop both screens are in one window, stacked; the mouse on the bottom one is a
+//! finger, and the keyboard stands in for the buttons (`nibkit::input::keyboard`: X is A, the
+//! arrows the D-pad, Escape quits).
 //!
 //! On the device, run it with nothing else on the screens (`sdk/run.sh` stops DSlot and starts
 //! it again afterwards). D-pad up / down: the top screen's brightness. A: change the colour,
 //! which is remembered. A finger on the bottom screen: a dot. Select + Start: quit.
 
-use nibkit::input::{printed, Face};
+use nibkit::input::{keyboard, printed, Face};
 use nibkit::screens::{self, Screen};
 use nibkit::settings::{Scope, Settings, Value};
 use nibkit::{backlight, paths::AppDirs, touch};
@@ -65,9 +69,11 @@ fn main() -> Result<(), String> {
             }
         }
         None => {
-            let (w, h) = (screens::WIDTH / 2, screens::HEIGHT / 2);
+            let screens::Windows::Stacked { size, .. } = screens::desktop_windows(true, 0.5) else {
+                unreachable!("asked for one window");
+            };
             let window = video
-                .window("hello", w, h * 2)
+                .window("hello", size.0, size.1)
                 .build()
                 .map_err(|e| e.to_string())?;
             let canvas = window
@@ -91,8 +97,46 @@ fn main() -> Result<(), String> {
     let mut dot: Option<(f32, f32)> = None;
     let mut select = false;
     let mut events = sdl.event_pump()?;
+    // On a desktop: where each screen is in the one window, and whether the mouse is down.
+    let stacked = match screens::desktop_windows(true, 0.5) {
+        screens::Windows::Stacked { top, bottom, .. } if placement.is_none() => Some((top, bottom)),
+        _ => None,
+    };
+    let mut mouse_down = false;
     'run: loop {
         for event in events.poll_iter() {
+            // The keyboard as the buttons: A changes the colour, Escape (Menu) quits.
+            let key = match &event {
+                Event::KeyDown {
+                    keycode: Some(k), ..
+                } => keyboard(&k.name()),
+                _ => None,
+            };
+            match key {
+                Some(nibkit::input::Button::Menu) => break 'run,
+                Some(nibkit::input::Button::A) => {
+                    next_colour(&mut colour, &mut settings);
+                    continue;
+                }
+                _ => {}
+            }
+            // The mouse on the bottom screen, as a finger.
+            if let Some((_, bottom)) = stacked {
+                match event {
+                    Event::MouseButtonDown { x, y, .. } => {
+                        mouse_down = true;
+                        dot = bottom.panel_point(x, y).map(as_fraction);
+                    }
+                    Event::MouseMotion { x, y, .. } if mouse_down => {
+                        dot = bottom.panel_point(x, y).map(as_fraction);
+                    }
+                    Event::MouseButtonUp { .. } => {
+                        mouse_down = false;
+                        dot = None;
+                    }
+                    _ => {}
+                }
+            }
             match event {
                 Event::Quit { .. } => break 'run,
                 Event::ControllerButtonDown {
@@ -134,12 +178,7 @@ fn main() -> Result<(), String> {
                 Event::ControllerButtonDown { button, .. }
                     if face(button).map(printed) == Some(Face::A) =>
                 {
-                    let at = COLOURS.iter().position(|(n, _)| *n == colour).unwrap_or(0);
-                    colour = COLOURS[(at + 1) % COLOURS.len()].0.to_owned();
-                    settings.set(Scope::System, "colour", colour.as_str().into());
-                    if let Err(e) = settings.save() {
-                        eprintln!("hello: {e}");
-                    }
+                    next_colour(&mut colour, &mut settings);
                 }
                 _ => {}
             }
@@ -164,12 +203,20 @@ fn main() -> Result<(), String> {
             let (w, h) = canvas.output_size()?;
             // Where the finger is on this window: the bottom screen's window, or the right half
             // of the stock OS's one across both.
-            let spot = match (dot, placement) {
-                (Some((x, y)), Some(p)) if p.shared => {
+            let spot = match (dot, placement, stacked) {
+                (Some((x, y)), Some(p), _) if p.shared => {
                     Some((w as f32 / 2.0 * (1.0 + x), y * h as f32))
                 }
-                (Some((x, y)), Some(_)) if *screen == Screen::Bottom => {
+                (Some((x, y)), Some(_), _) if *screen == Screen::Bottom => {
                     Some((x * w as f32, y * h as f32))
+                }
+                // A desktop's one window: the bottom screen's part of it, in its drawing pixels.
+                (Some((x, y)), None, Some((_, bottom))) => {
+                    let k = w as f32 / bottom.w as f32;
+                    Some((
+                        (bottom.x as f32 + x * bottom.w as f32) * k,
+                        (bottom.y as f32 + y * bottom.h as f32) * k,
+                    ))
                 }
                 _ => None,
             };
@@ -181,6 +228,21 @@ fn main() -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// The next colour, remembered in the app's settings.
+fn next_colour(colour: &mut String, settings: &mut Settings) {
+    let at = COLOURS.iter().position(|(n, _)| *n == colour).unwrap_or(0);
+    *colour = COLOURS[(at + 1) % COLOURS.len()].0.to_owned();
+    settings.set(Scope::System, "colour", colour.as_str().into());
+    if let Err(e) = settings.save() {
+        eprintln!("hello: {e}");
+    }
+}
+
+/// A point on the panel (1024 x 768 units) as a fraction of it, as the touch panel gives one.
+fn as_fraction((x, y): (f32, f32)) -> (f32, f32) {
+    (x / screens::WIDTH as f32, y / screens::HEIGHT as f32)
 }
 
 /// SDL's face buttons as nibkit names them.

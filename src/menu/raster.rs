@@ -10,8 +10,11 @@ use fontdue::{Font, FontSettings};
 
 /// A picture the size of a screen (1024 × 768, or scaled by `scale`), RGBA, rows top first.
 pub struct Canvas {
+    /// Its width, in pixels.
     pub w: usize,
+    /// Its height, in pixels.
     pub h: usize,
+    /// The pixels: 4 bytes each, red, green, blue and alpha.
     pub px: Vec<u8>,
     /// Screen units to pixels.
     pub scale: f32,
@@ -30,6 +33,7 @@ impl Default for Fonts {
 }
 
 impl Fonts {
+    /// Loads both faces, which are built in.
     pub fn new() -> Fonts {
         let load = |b: &[u8]| Font::from_bytes(b, FontSettings::default()).expect("embedded font");
         Fonts {
@@ -64,6 +68,7 @@ impl Canvas {
         Canvas { w, h, px, scale }
     }
 
+    /// Fills the whole picture with `c`.
     pub fn clear(&mut self, c: Rgb) {
         for p in self.px.chunks_exact_mut(4) {
             p.copy_from_slice(&[c[0], c[1], c[2], 255]);

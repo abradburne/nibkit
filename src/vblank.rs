@@ -53,6 +53,7 @@ mod drm {
 }
 
 impl Vblank {
+    /// Opens the first KMS card.
     #[cfg(not(nibkit_desktop))]
     pub fn open() -> io::Result<Vblank> {
         use std::os::fd::FromRawFd;
@@ -71,6 +72,7 @@ impl Vblank {
         Err(io::Error::new(io::ErrorKind::NotFound, "no KMS card"))
     }
 
+    /// Fails: vblanks are only on Linux.
     #[cfg(nibkit_desktop)]
     pub fn open() -> io::Result<Vblank> {
         Err(io::Error::new(
@@ -101,6 +103,7 @@ impl Vblank {
         Ok(Duration::new(v.tval_sec as u64, v.tval_usec as u32 * 1000))
     }
 
+    /// Fails: vblanks are only on Linux.
     #[cfg(nibkit_desktop)]
     pub fn wait(&self, screen: Screen) -> io::Result<Duration> {
         let _ = pipe(screen);

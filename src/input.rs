@@ -14,9 +14,13 @@ use crate::platform;
 /// A face button.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Face {
+    /// A: the right-hand button on the DS+, the bottom one to SDL.
     A,
+    /// B: the bottom button on the DS+, the right-hand one to SDL.
     B,
+    /// X: the top button on the DS+, the left-hand one to SDL.
     X,
+    /// Y: the left-hand button on the DS+, the top one to SDL.
     Y,
 }
 
@@ -51,17 +55,29 @@ pub const BACK_KEYCODES: &[&str] = &["Sleep", "AC Back"];
 /// One of the DS+'s buttons, by its label.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Button {
+    /// Up on the D-pad.
     Up,
+    /// Down on the D-pad.
     Down,
+    /// Left on the D-pad.
     Left,
+    /// Right on the D-pad.
     Right,
+    /// A, the right-hand face button.
     A,
+    /// B, the bottom face button.
     B,
+    /// X, the top face button.
     X,
+    /// Y, the left-hand face button.
     Y,
+    /// The left shoulder button.
     L,
+    /// The right shoulder button.
     R,
+    /// The Start button.
     Start,
+    /// The Select button.
     Select,
     /// The Menu (Home) button.
     Menu,
@@ -133,6 +149,7 @@ impl<K: Copy + PartialEq> Repeat<K> {
     /// Held this long, a button repeats twice as often.
     pub const FASTER_AFTER: std::time::Duration = std::time::Duration::from_millis(1500);
 
+    /// Repeats after `first`, then every `every`; nothing held yet.
     pub fn new(first: std::time::Duration, every: std::time::Duration) -> Repeat<K> {
         Repeat {
             first,

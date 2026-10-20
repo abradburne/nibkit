@@ -2,6 +2,14 @@
 
 ## 0.1.0 (unreleased)
 
+- `desktop` (feature, and the choice on any target but Linux): an app made for the handheld
+  builds and runs on a computer: windows for the screens (`screens::desktop_windows`, the mouse
+  on the bottom one as touch with `Rect::panel_point`), a keyboard map (`input::keyboard`,
+  `input::Button`), the platform's own app folders, games in nibOS's data folder or
+  `NIBKIT_ROMS`, and the handheld's controls `None`. Apps may say `runs_on = ["desktop"]`.
+- Ready for crates.io: metadata, the files a package carries, documentation on everything
+  public, Rust 1.87.
+
 - First version, from DSlot's code: screens and their placement, vblank waits, face-button
   labels, the touch panel, per-screen brightness, volume and Wi-Fi, audio advice, app folders,
   layered settings (system / console / game), and DSlot's description files (feature

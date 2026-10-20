@@ -11,7 +11,7 @@ pub struct Menu {
     pub rows: Vec<Row>,
     /// The highlighted row, among all of them.
     pub row: usize,
-    /// The first row on screen ([`crate::menu::Cursor`] keeps it so the highlight is in view).
+    /// The first row on screen ([`Menu::settle`] keeps the highlight in view).
     pub scroll: usize,
     /// The buttons' line above the bar: what each does here.
     pub hint: String,
@@ -20,7 +20,9 @@ pub struct Menu {
 /// One row: its label on the left, its value on the right.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Row {
+    /// What the row is, on the left.
     pub label: String,
+    /// What it shows on the right.
     pub value: Value,
     /// A heading over the rows that follow it, not a row to highlight: drawn small and faint.
     pub heading: bool,
@@ -29,6 +31,7 @@ pub struct Row {
 }
 
 impl Row {
+    /// A row to highlight, with no note.
     pub fn new(label: impl Into<String>, value: Value) -> Row {
         Row {
             label: label.into(),
@@ -74,16 +77,24 @@ pub enum Value {
     Slider(u8),
     /// An action waiting for its second press ("A again to delete"): white, or red when it
     /// deletes something.
-    Prompt { text: String, warning: bool },
+    Prompt {
+        /// What it says.
+        text: String,
+        /// Whether it deletes something: red.
+        warning: bool,
+    },
 }
 
 /// A shelf of cards, one highlighted, as DSlot shows carts: save state slots.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Shelf {
+    /// Each page's tab, and whether it is the page on show.
     pub tabs: Vec<(String, bool)>,
+    /// The cards, in order.
     pub cards: Vec<Card>,
     /// The highlighted card.
     pub at: usize,
+    /// The buttons' line above the bar: what each does here.
     pub hint: String,
 }
 
@@ -93,6 +104,7 @@ pub struct Card {
     /// Which of the app's pictures goes on the card (it draws [`crate::menu::Draw::Picture`]
     /// with this), or `None` for an empty slot.
     pub picture: Option<usize>,
+    /// The line under the card.
     pub label: String,
 }
 
@@ -103,6 +115,7 @@ pub struct Status {
     pub clock: String,
     /// The battery's level and whether it is charging, where there is one.
     pub battery: Option<(u8, bool)>,
+    /// The slot in the bar's top edge.
     pub slot: Slot,
 }
 

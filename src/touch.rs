@@ -18,8 +18,11 @@
 /// A finger on the touch screen: 0..1 across and down from the top left, or scaled.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Pointer {
+    /// A finger touches the screen, here.
     Down(f32, f32),
+    /// The finger moves to here.
     Move(f32, f32),
+    /// The finger lifts.
     Up,
 }
 
@@ -37,14 +40,17 @@ impl Pointer {
 #[cfg(not(nibkit_desktop))]
 pub use linux::Panel;
 
+/// The touch panel. A desktop has none: [`Panel::open`] always gives `None`.
 #[cfg(nibkit_desktop)]
 pub struct Panel;
 
 #[cfg(nibkit_desktop)]
 impl Panel {
+    /// `None`: a desktop has no touch panel.
     pub fn open() -> Option<Panel> {
         None
     }
+    /// Nothing: a desktop has no touch panel.
     pub fn poll(&mut self, _out: &mut Vec<Pointer>) {}
 }
 
@@ -87,6 +93,7 @@ mod linux {
         value: i32,
     }
 
+    /// The touch panel, open for reading.
     pub struct Panel {
         fd: c_int,
         x: (i32, i32),

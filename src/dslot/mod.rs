@@ -137,6 +137,7 @@ struct ActionDecl {
 /// for, and the words it adds to the command.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EmuOption {
+    /// The setting it is, keyed `<emulator>.<key>`.
     pub def: Def,
     systems: Vec<String>,
     /// With `{value}` for the value; for a toggle, the words when on.
@@ -146,6 +147,7 @@ pub struct EmuOption {
 }
 
 impl EmuOption {
+    /// Whether it is for `system`'s games.
     pub fn applies(&self, system: &str) -> bool {
         self.systems.iter().any(|s| s == system)
     }
@@ -262,6 +264,7 @@ impl EmuOption {
 /// An action on a game's files.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Action {
+    /// What DSlot's menu shows for it.
     pub label: String,
     systems: Vec<String>,
     /// Files to delete: paths with placeholders, `*` allowed in the last part.
@@ -269,6 +272,7 @@ pub struct Action {
 }
 
 impl Action {
+    /// Whether it is for `system`'s games.
     pub fn applies(&self, system: &str) -> bool {
         self.systems.iter().any(|s| s == system)
     }
@@ -279,6 +283,7 @@ impl Action {
 #[derive(Deserialize, Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Seed {
+    /// The file to copy.
     pub from: PathBuf,
     /// `~/` at the start is the home folder.
     pub to: PathBuf,
@@ -289,13 +294,21 @@ pub struct Seed {
 pub struct Emulator {
     /// The description's file name without `.toml`: what settings.ini and launch.conf call it.
     pub id: String,
+    /// The name DSlot shows.
     pub name: String,
+    /// Each system's default is the installed emulator with the highest.
     pub priority: i32,
     commands: Vec<(String, Vec<String>)>,
+    /// Environment variables set for it.
     pub env: Vec<(String, String)>,
+    /// Files put in place before a game starts.
     pub seed: Vec<Seed>,
+    /// A line of its output that says it went back to a menu of its own, at which DSlot asks it
+    /// to quit (SIGTERM).
     pub quit_on_output: Option<String>,
+    /// Its options, which DSlot shows as settings.
     pub options: Vec<EmuOption>,
+    /// Its actions on a game's files.
     pub actions: Vec<Action>,
 }
 
@@ -313,6 +326,7 @@ impl Emulator {
             .map(|(_, c)| c.as_slice())
     }
 
+    /// Whether it is installed for `system`.
     pub fn plays(&self, system: &str) -> bool {
         self.command(system).is_some()
     }
@@ -443,6 +457,7 @@ impl Emulators {
         Emulators { all }
     }
 
+    /// The emulator with this id, if it is installed.
     pub fn get(&self, id: &str) -> Option<&Emulator> {
         self.all.iter().find(|e| e.id == id)
     }

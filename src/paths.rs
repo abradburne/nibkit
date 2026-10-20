@@ -26,6 +26,7 @@ pub struct AppDirs {
 }
 
 impl AppDirs {
+    /// The XDG folders for `app`: `~/.config/<app>`, `~/.local/share/<app>`, `~/.cache/<app>`.
     #[cfg(nibkit_nibos)]
     pub fn new(app: &str) -> AppDirs {
         AppDirs {
@@ -66,6 +67,7 @@ impl AppDirs {
         }
     }
 
+    /// The folder the program is in, for settings and data, and a `cache` folder in it.
     #[cfg(nibkit_stock)]
     pub fn new(_app: &str) -> AppDirs {
         let here = exe_dir();

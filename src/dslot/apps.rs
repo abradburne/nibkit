@@ -28,14 +28,20 @@ use std::path::{Path, PathBuf};
 #[derive(Deserialize, Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct App {
+    /// The name DSlot shows.
     pub name: String,
+    /// A line shown under the name.
     #[serde(default)]
     pub description: Option<String>,
+    /// The program and its arguments ([`App::command_in`] finds the program).
     pub command: Vec<String>,
+    /// The icon, relative to the folder; `icon.png` if left out.
     #[serde(default)]
     pub icon: Option<PathBuf>,
+    /// The systems it runs on (`nibos`, `stock`, `desktop`); nibOS only if left out.
     #[serde(default = "nibos_only")]
     pub runs_on: Vec<String>,
+    /// Environment variables set for it.
     #[serde(default)]
     pub env: BTreeMap<String, String>,
 }
@@ -88,6 +94,7 @@ pub struct Found {
     pub folder: PathBuf,
     /// Its folder's name (a stock script's name): what DSlot keeps its play time by.
     pub id: String,
+    /// Its description.
     pub app: App,
     /// Its icon, if the file is there.
     pub icon: Option<PathBuf>,

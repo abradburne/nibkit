@@ -10,15 +10,25 @@ use super::model::{Menu, Shelf, Value};
 /// A button, by what is printed on it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Key {
+    /// Up: the highlight up a row.
     Up,
+    /// Down: the highlight down a row.
     Down,
+    /// Left: the row's value back.
     Left,
+    /// Right: the row's value on.
     Right,
+    /// A: choose.
     A,
+    /// B: back.
     B,
+    /// X: on a shelf, a button on the highlighted card (save).
     X,
+    /// Y: back to the level above for the row.
     Y,
+    /// L: the page before.
     L,
+    /// R: the page after.
     R,
 }
 
@@ -26,7 +36,12 @@ pub enum Key {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Effect {
     /// Step this row's value back (-1) or on (+1).
-    Change { row: usize, step: i32 },
+    Change {
+        /// The row, among all of them.
+        row: usize,
+        /// -1 back, +1 on.
+        step: i32,
+    },
     /// Act on this row (open what it opens, do what it does).
     Choose(usize),
     /// Back to the level above for this row (Y): clear it here.
@@ -36,7 +51,12 @@ pub enum Effect {
     /// Back a level, or close the menu at the top.
     Back,
     /// On a shelf: a button on the highlighted card (A load, X save, Y ...).
-    Card { at: usize, key: Key },
+    Card {
+        /// The highlighted card.
+        at: usize,
+        /// The button.
+        key: Key,
+    },
 }
 
 /// Turns a page by `step` tabs, round from the last to the first.

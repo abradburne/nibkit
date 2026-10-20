@@ -21,15 +21,18 @@
 
 use crate::platform;
 
-/// A screen's size, in pixels.
+/// A screen's width, in pixels.
 pub const WIDTH: u32 = 1024;
+/// A screen's height, in pixels.
 pub const HEIGHT: u32 = 768;
 
 /// The panels' refresh rate, in Hz: 59.94 measured on nibOS.
 pub const REFRESH_HZ: f64 = platform::REFRESH_HZ;
 
+/// One of the two panels.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Screen {
+    /// The top screen.
     Top,
     /// The one with the touch panel.
     Bottom,
@@ -50,13 +53,18 @@ pub const LAYOUT: Layout = platform::LAYOUT;
 /// A rectangle in pixels.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Rect {
+    /// Its left edge.
     pub x: i32,
+    /// Its top edge.
     pub y: i32,
+    /// Its width.
     pub w: u32,
+    /// Its height.
     pub h: u32,
 }
 
 impl Rect {
+    /// A rectangle `w` by `h` with its top left corner at (`x`, `y`).
     pub const fn new(x: i32, y: i32, w: u32, h: u32) -> Rect {
         Rect { x, y, w, h }
     }
@@ -73,20 +81,25 @@ impl Rect {
 /// list's coordinates).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Region {
+    /// Which display, by its place in the list.
     pub display: usize,
+    /// The part of the display the screen covers.
     pub rect: Rect,
 }
 
 /// Where both screens are.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Placement {
+    /// Where the top screen is.
     pub top: Region,
+    /// Where the bottom screen is.
     pub bottom: Region,
     /// Both on one display: one window across it is enough.
     pub shared: bool,
 }
 
 impl Placement {
+    /// Where `screen` is.
     pub fn region(&self, screen: Screen) -> Region {
         match screen {
             Screen::Top => self.top,
@@ -159,12 +172,18 @@ pub fn place(displays: &[Rect], swap: bool) -> Option<Placement> {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Windows {
     /// A window for each screen, both this size.
-    Two { size: (u32, u32) },
+    Two {
+        /// Each window's size, in pixels.
+        size: (u32, u32),
+    },
     /// One window this size with both screens in it, the top one above the bottom one and a
     /// gap between, as the handheld holds them; each screen's place in the window.
     Stacked {
+        /// The window's size, in pixels.
         size: (u32, u32),
+        /// The top screen's place in the window.
         top: Rect,
+        /// The bottom screen's place in the window.
         bottom: Rect,
     },
 }

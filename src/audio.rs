@@ -9,10 +9,13 @@ use std::{io, process::Command};
 /// that plays without gaps.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Advice {
+    /// The sample rate, in Hz.
     pub rate: u32,
+    /// The buffer size, in frames.
     pub buffer_frames: u32,
 }
 
+/// The advice for the system nibkit was built for.
 pub const ADVICE: Advice = Advice {
     rate: platform::AUDIO_RATE,
     buffer_frames: platform::AUDIO_BUFFER,
@@ -23,7 +26,9 @@ pub const ADVICE: Advice = Advice {
 /// stock firmware ([`import_tuning`]).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Tuning {
+    /// nibOS's own: the DSP bypassed, the gain conservative.
     Nibos,
+    /// The official one, imported from the user's stock firmware.
     Official,
     /// A file nibOS didn't put there.
     Other,

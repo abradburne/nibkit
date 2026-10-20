@@ -6,20 +6,25 @@ use super::colour::{self, Rgb};
 use super::model::{Menu, Shelf, Slot, Status, Value};
 use super::{H, W};
 
-/// The first row's centre, how far apart rows are, and how many fit.
+/// The first row's centre, in screen units.
 pub const TOP: f32 = 156.0;
+/// How far apart rows are, in screen units.
 pub const ROW_STEP: f32 = 46.0;
+/// How many rows fit on the screen.
 pub const VISIBLE: usize = 10;
 /// The tabs: the first one's corner, and each one's size.
 pub const TABS: (f32, f32, f32, f32) = (28.0, 10.0, 130.0, 40.0);
-/// Labels start here; values end here.
+/// Where labels start, in screen units.
 pub const LEFT: f32 = 150.0;
+/// Where values end, in screen units.
 pub const RIGHT: f32 = W - 150.0;
-/// The bar along the bottom, and the hint line above it.
+/// The height of the bar along the bottom, in screen units.
 pub const BAR_H: f32 = 96.0;
+/// The top of the hint line above the bar, in screen units.
 pub const HINT_Y: f32 = 636.0;
-/// A star, and the battery icon's height.
+/// A star's size, in screen units.
 pub const ICON: f32 = 26.0;
+/// The battery icon's height, in screen units.
 pub const BATTERY: f32 = 22.0;
 
 /// One thing to draw.
@@ -27,64 +32,112 @@ pub const BATTERY: f32 = 22.0;
 pub enum Draw {
     /// A filled rectangle.
     Rect {
+        /// Its left edge.
         x: f32,
+        /// Its top edge.
         y: f32,
+        /// Its width.
         w: f32,
+        /// Its height.
         h: f32,
+        /// Its colour.
         colour: Rgb,
     },
     /// A filled rectangle with its corners rounded by `radius`.
     Round {
+        /// Its left edge.
         x: f32,
+        /// Its top edge.
         y: f32,
+        /// Its width.
         w: f32,
+        /// Its height.
         h: f32,
+        /// How far the corners are rounded.
         radius: f32,
+        /// Its colour.
         colour: Rgb,
     },
     /// A rectangle's outline, `width` thick inside it, corners rounded by `radius`.
     Frame {
+        /// Its left edge.
         x: f32,
+        /// Its top edge.
         y: f32,
+        /// Its width.
         w: f32,
+        /// Its height.
         h: f32,
+        /// How far the corners are rounded.
         radius: f32,
+        /// How thick the outline is, inside the rectangle.
         width: f32,
+        /// Its colour.
         colour: Rgb,
     },
     /// One line of text, `size` units high, the top of its line box at `y`; `anchor` is where
     /// `x` falls along it: 0 its left end, 0.5 its middle, 1 its right end.
     Text {
+        /// The text.
         text: String,
+        /// How high it is, in screen units.
         size: f32,
+        /// Whether it is in the bold face.
         bold: bool,
+        /// Where `anchor` falls along the line.
         x: f32,
+        /// The top of its line box.
         y: f32,
+        /// Where `x` falls along the line: 0 its left end, 0.5 its middle, 1 its right end.
         anchor: f32,
+        /// Its colour.
         colour: Rgb,
     },
     /// `rating` of 5 stars from `x`, each `ICON` square, 4 apart; the rest faint.
-    Stars { x: f32, y: f32, rating: u8 },
+    Stars {
+        /// The first star's left edge.
+        x: f32,
+        /// The stars' top edge.
+        y: f32,
+        /// How many of the 5 are lit.
+        rating: u8,
+    },
     /// The battery icon, `h` tall and 2.1 times as wide.
     Battery {
+        /// Its left edge.
         x: f32,
+        /// Its top edge.
         y: f32,
+        /// Its height.
         h: f32,
+        /// The charge, 0-100: red at 15 or under unless charging.
         percent: u8,
+        /// Whether it is charging: a bolt over it.
         charging: bool,
     },
     /// The bar, the slot cut into its top edge.
-    Bar { y: f32, slot: Slot },
+    Bar {
+        /// Its top edge.
+        y: f32,
+        /// The slot cut into it.
+        slot: Slot,
+    },
     /// One of the app's own pictures (a save state's), fitted into the box: as large as it goes
     /// with its own proportions kept, centred, the box's background showing round it. A
     /// one-screen picture (GB, GBA) and a DS state's two screens stacked (256 x 384) both fit.
     /// `faded` dims it.
     Picture {
+        /// Which of the app's pictures.
         index: usize,
+        /// The box's left edge.
         x: f32,
+        /// The box's top edge.
         y: f32,
+        /// The box's width.
         w: f32,
+        /// The box's height.
         h: f32,
+        /// Whether it is dimmed.
         faded: bool,
     },
 }
@@ -338,8 +391,11 @@ pub fn menu_measured(
 
 /// The cards' boxes: the highlighted one in the middle, its neighbours either side, smaller.
 pub const CARD: (f32, f32) = (300.0, 310.0);
+/// Its neighbours' size.
 pub const SIDE_CARD: (f32, f32) = (250.0, 260.0);
+/// How far apart the cards' centres are.
 pub const CARD_STEP: f32 = 330.0;
+/// The highlighted card's top.
 pub const CARD_Y: f32 = 190.0;
 
 /// The box of the card `offset` places from the highlighted one (0), if it is on screen.

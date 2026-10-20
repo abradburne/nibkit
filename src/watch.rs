@@ -63,12 +63,12 @@ impl std::os::fd::AsRawFd for Watch {
     }
 }
 
-#[cfg(test)]
+// inotify: Linux only.
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
 
     #[test]
-    #[cfg(target_os = "linux")]
     fn sees_writes() {
         let dir = crate::testing::TempDir::new("watch");
         let (a, b) = (dir.path().join("brightness"), dir.path().join("bl_power"));

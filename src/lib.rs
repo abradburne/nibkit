@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! nibkit: what an app on a nibOS handheld (the Anbernic RG DS+ today) needs to know and do,
 //! without depending on any one graphics or input library. Use it with SDL (as the template
 //! in `sdk/template` does), or anything else.

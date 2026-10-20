@@ -102,6 +102,8 @@ fn volume_event(line: &str) -> bool {
     }
 }
 
+/// Sets the default output's volume, in percent (100 at most). Does nothing where the
+/// system keeps the volume to itself.
 pub fn set_volume(percent: u8) {
     if platform::VOLUME {
         let level = format!("{}%", percent.min(100));

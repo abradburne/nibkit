@@ -6,15 +6,42 @@ volume, where its files go, and settings at three levels. A Rust library, MIT, w
 library of its own: use it with SDL, as [`examples/hello.rs`](examples/hello.rs) and
 [`../template`](../template) do, or anything else.
 
-The same app builds for **nibOS** (feature `nibos`, the default) or the RG DS+'s **stock OS**
-(feature `stock`). Where the stock OS lacks something (each screen's brightness, a volume an
-app may set, the network switch), nibkit says so with `None` instead of guessing.
+The same app builds for **nibOS** (feature `nibos`, the default), the RG DS+'s **stock OS**
+(feature `stock`) or a **desktop** computer (feature `desktop`; chosen on its own on macOS and
+Windows), so it can be built, tried and played anywhere. Where a system lacks something (each
+screen's brightness, a volume an app may set, the network switch), nibkit says so with `None`
+instead of guessing.
 
 ```toml
 [dependencies]
-nibkit = { path = "../nibos/sdk/nibkit" }                                       # nibOS
-# nibkit = { path = "...", default-features = false, features = ["stock"] }    # the stock OS
+nibkit = "0.1"                                                         # nibOS; a desktop on macOS
+# nibkit = { version = "0.1", features = ["desktop"] }                 # a Linux desktop
+# nibkit = { version = "0.1", default-features = false, features = ["stock"] }  # the stock OS
 ```
+
+## Features
+
+| Feature | |
+|---|---|
+| `nibos` (default) | Built for nibOS: its panels, nibos-hw's gamepad and backlight links, PipeWire, the `nib` command. |
+| `stock` | Built for the RG DS+'s stock OS (Weston across both panels, its own helper keeping volume and brightness). |
+| `desktop` | Built for a computer: no panels (an app opens windows: `screens::desktop_windows`, the mouse on the bottom one as touch: `Rect::panel_point`), a keyboard map (`input::keyboard`), the platform's own app folders, the handheld's controls `None`. Chosen anyway on any target but Linux. |
+| `dslot` | For an emulator or app DSlot starts: description files, the apps folder, the saves convention, DSlot's settings file. |
+| `menu` | DSlot's menu for any app's touch screen: what goes where, and the buttons and touches. No dependencies. |
+| `menu-raster` | `menu`, drawn into an RGBA picture in Roboto Condensed (embedded, SIL OFL 1.1: `assets/OFL.txt`). |
+
+Rust 1.87 or later.
+
+## On a desktop
+
+Both screens show in windows (one each, or one with both stacked as the handheld holds them),
+the keyboard stands in for the buttons (the arrows, X and Z for A and B, S and A for X and Y, Q
+and W for L and R, Return for Start, Escape for Menu) as does any gamepad SDL knows, and the
+mouse on the bottom screen is a finger. Settings, data and cache go in the platform's own
+folders (`~/Library/Application Support/<app>` on macOS, the XDG folders on Linux); games in
+`Roms` in nibOS's data folder there, or wherever `NIBKIT_ROMS` says. Brightness, the battery,
+the speakers' tuning, the network and powering off are the handheld's: `None`, or nothing done
+(an app never powers off the computer).
 
 ## What is in it
 
@@ -40,7 +67,8 @@ them, A by its label, a dot under a finger, the top screen's brightness on the D
 remembered in the app's settings.
 
 ```sh
-cargo run --example hello                                         # nibOS, or a desktop
+cargo run --example hello                                         # nibOS, or a desktop (macOS)
+cargo run --example hello --features desktop                      # a Linux desktop
 cargo run --example brightness                                    # nibOS: brightness as it changes
 cargo run --example battery                                       # nibOS: the battery and battery protect
 cargo run --example hello --no-default-features --features stock  # built for the stock OS
@@ -84,9 +112,12 @@ program exits): `docs/emulators.md` in the DSlot repository.
 ## Building and testing
 
 ```sh
-cargo test                                               # nibOS
-cargo test --no-default-features --features stock,dslot  # the stock OS, with DSlot's part
-cargo clippy --all-targets --features dslot -- -D warnings
+cargo test --features dslot,menu-raster                                 # nibOS (a desktop on macOS)
+cargo test --features desktop,dslot,menu-raster                         # a desktop
+cargo test --no-default-features --features stock,dslot,menu-raster     # the stock OS
+cargo clippy --all-targets --features dslot,menu-raster -- -D warnings
 ```
+
+Every test runs on a desktop, Linux or macOS: none needs the handheld.
 
 The example needs SDL2 (`sdl2-compat` on nibOS; Homebrew's `sdl2` on a Mac).

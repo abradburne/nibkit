@@ -6,10 +6,30 @@ rust-version = "1.87"
 description = "What an app on a nibOS handheld needs to know and do: both screens, vblank, the buttons' names, touch, brightness, volume, where its files go, layered settings"
 # MIT, and the fonts in assets/ (embedded by `menu-raster`) under the SIL OFL 1.1.
 license = "MIT AND OFL-1.1"
+# Placeholders until the repository is public: the user fills these in before publishing.
 repository = "https://github.com/abradburne/nibos"
+homepage = "https://github.com/abradburne/nibos/tree/main/sdk/nibkit"
+documentation = "https://docs.rs/nibkit"
+readme = "README.md"
+keywords = ["handheld", "nibos", "dual-screen", "rg-ds", "sdl2"]
+categories = ["game-development", "hardware-support", "os::linux-apis"]
+# What goes into the published crate: the code, the fonts `menu-raster` embeds with their
+# licence, the examples, and the documents.
+include = [
+    "src/**/*.rs",
+    "build.rs",
+    "assets/*.ttf",
+    "assets/OFL.txt",
+    "assets/README",
+    "examples/*.rs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+]
 
-# The system the app runs on: one of `nibos` (the default) or `stock` (the RG DS+'s own OS),
-# chosen when the app is built. `dslot` adds what an emulator or app needs to appear in DSlot.
+# The system the app runs on, chosen when it is built: `nibos` (the default), `stock` (the RG
+# DS+'s own OS) or `desktop` (a computer: windows, keyboard, mouse; chosen anyway on any target
+# but Linux). `dslot` adds what an emulator or app needs to appear in DSlot.
 [features]
 default = ["nibos"]
 nibos = []
@@ -30,3 +50,7 @@ fontdue = { version = "0.9", optional = true }
 [dev-dependencies]
 # For the example only: nibkit itself uses no graphics library.
 sdl2 = "0.38"
+
+# docs.rs: everything there is, as it builds on Linux (nibOS).
+[package.metadata.docs.rs]
+features = ["dslot", "menu-raster"]

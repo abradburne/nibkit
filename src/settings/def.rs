@@ -14,9 +14,13 @@ pub enum Kind {
     Toggle,
     /// A whole number from `min` to `max` in steps of `step`, shown with `unit` after it.
     Number {
+        /// The lowest value.
         min: i64,
+        /// The highest value.
         max: i64,
+        /// How far apart the values are.
         step: i64,
+        /// What is shown after the value ("%", "ms").
         unit: String,
     },
 }
@@ -36,8 +40,11 @@ impl Kind {
 /// The levels a setting can be set at.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Levels {
+    /// Whether it can be set for everything.
     pub system: bool,
+    /// Whether it can be set for a console.
     pub console: bool,
+    /// Whether it can be set for a game.
     pub game: bool,
 }
 
@@ -60,12 +67,14 @@ impl Levels {
         console: true,
         game: true,
     };
+    /// At every level.
     pub const ALL: Levels = Levels {
         system: true,
         console: true,
         game: true,
     };
 
+    /// Whether it can be set at `scope`.
     pub fn has(self, scope: &Scope) -> bool {
         match scope {
             Scope::System => self.system,
@@ -81,8 +90,11 @@ pub struct Def {
     /// Its key in the settings file. A dot puts it in a table of its own: `dsperate.hires3d`
     /// is `hires3d` in `[console.NDS.dsperate]`.
     pub key: String,
+    /// What the menu calls it.
     pub label: String,
+    /// The values it takes.
     pub kind: Kind,
+    /// The levels it can be set at.
     pub levels: Levels,
     /// What it is when no level sets it. `None`: up to whatever the value is passed to.
     pub default: Option<Value>,

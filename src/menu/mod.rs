@@ -40,12 +40,14 @@ pub use input::{Effect, Key};
 pub use layout::Draw;
 pub use model::{Card, Menu, Row, Shelf, Slot, Status, Value};
 
-/// The screen the menu is laid out for (the RG DS+'s panels), in its units.
+/// The width of the screen the menu is laid out for (the RG DS+'s panels), in its units.
 pub const W: f32 = 1024.0;
+/// That screen's height, in its units.
 pub const H: f32 = 768.0;
 
 /// DSlot's colours.
 pub mod colour {
+    /// A colour: red, green and blue, 0-255 each.
     pub type Rgb = [u8; 3];
     /// Text that matters: values, the highlighted row's label.
     pub const WHITE: Rgb = [241, 243, 248];

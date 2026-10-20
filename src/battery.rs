@@ -24,10 +24,13 @@ use std::{io, path::Path, process::Command, time::Duration};
 /// What the battery is doing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum State {
+    /// Running on the battery.
     Discharging,
+    /// Taking charge from the charger.
     Charging,
     /// On the charger, not charging: battery protect holds it, or it won't take more.
     NotCharging,
+    /// Charged full, on the charger.
     Full,
 }
 
@@ -36,13 +39,15 @@ pub enum State {
 pub struct Battery {
     /// The state of charge, 0-100.
     pub percent: u8,
+    /// What it is doing.
     pub state: State,
     /// Whether the charger is plugged in.
     pub plugged_in: bool,
-    /// Charge now and when full, in µAh, and the current into the battery (negative out of it),
-    /// in µA.
+    /// The charge now, in µAh.
     pub charge_uah: i64,
+    /// The charge when full, in µAh.
     pub full_uah: i64,
+    /// The current into the battery, in µA; negative out of it.
     pub current_ua: i64,
 }
 

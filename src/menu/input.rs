@@ -183,6 +183,8 @@ impl Shelf {
                 self.at += 1;
                 None
             }
+            // The resume point is loaded, never saved onto or cleared: the game writes it.
+            Key::X | Key::Y if self.cards.get(self.at).is_some_and(|c| c.resume) => None,
             Key::A | Key::X | Key::Y if !self.cards.is_empty() => {
                 Some(Effect::Card { at: self.at, key })
             }
@@ -198,16 +200,10 @@ impl Shelf {
         if let Some(t) = layout::tab_hit(x, y, self.tabs.len()) {
             return (!self.tabs[t].1).then_some(Effect::Page(t));
         }
-        match layout::card_hit(x, y)? {
-            0 => (!self.cards.is_empty()).then_some(Effect::Card {
-                at: self.at,
-                key: Key::A,
-            }),
-            o => {
-                let at = self.at as i32 + o;
-                if (0..self.cards.len() as i32).contains(&at) {
-                    self.at = at as usize;
-                }
+        match layout::card_hit(self, x, y)? {
+            at if at == self.at => Some(Effect::Card { at, key: Key::A }),
+            at => {
+                self.at = at;
                 None
             }
         }
@@ -326,12 +322,7 @@ mod tests {
     fn a_shelf_moves_and_acts_on_its_cards() {
         let mut s = Shelf {
             tabs: vec![("Play".into(), false), ("States".into(), true)],
-            cards: (0..3)
-                .map(|i| Card {
-                    picture: None,
-                    label: format!("{i}"),
-                })
-                .collect(),
+            cards: (0..3).map(|i| Card::slot(None, format!("{i}"))).collect(),
             at: 0,
             hint: String::new(),
         };
@@ -346,5 +337,19 @@ mod tests {
             Some(Effect::Card { at: 2, key: Key::A })
         );
         assert_eq!(s.key(Key::L), Some(Effect::Page(0)));
+    }
+
+    #[test]
+    fn the_resume_point_loads_but_takes_no_save() {
+        let mut s = Shelf {
+            cards: vec![Card::resume(None, "r"), Card::slot(None, "1")],
+            ..Shelf::default()
+        };
+        s.at = s.first_slot();
+        s.key(Key::Left);
+        assert_eq!(s.at, 0);
+        assert_eq!(s.key(Key::X), None);
+        assert_eq!(s.key(Key::Y), None);
+        assert_eq!(s.key(Key::A), Some(Effect::Card { at: 0, key: Key::A }));
     }
 }

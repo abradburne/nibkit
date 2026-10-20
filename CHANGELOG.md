@@ -7,6 +7,11 @@
   on the bottom one as touch with `Rect::panel_point`), a keyboard map (`input::keyboard`,
   `input::Button`), the platform's own app folders, games in nibOS's data folder or
   `NIBKIT_ROMS`, and the handheld's controls `None`. Apps may say `runs_on = ["desktop"]`.
+- `menu`: a states shelf's resume point (`Card::resume`, before the numbered slots made with
+  `Card::slot`): set apart on the left and drawn differently, with a RESUME tag; A loads it, X
+  and Y do nothing on it, and the slot counter leaves it out. `Shelf::first_slot` is where the
+  shelf opens. `layout::card_box` and `card_hit` now take the shelf and give card indices.
+  nibkit-menu-c: `nib_menu_resume_card`, `nib_menu_first_slot`.
 - Ready for crates.io: metadata, the files a package carries, documentation on everything
   public, Rust 1.87.
 

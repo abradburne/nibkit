@@ -106,6 +106,39 @@ pub struct Card {
     pub picture: Option<usize>,
     /// The line under the card.
     pub label: String,
+    /// The resume point (the state written when the game was last left), not a numbered slot:
+    /// first on the shelf, a little apart from the slots and drawn differently; it can be
+    /// loaded, never saved onto (the game writes it when it is left).
+    pub resume: bool,
+}
+
+impl Card {
+    /// A numbered save slot: its picture (`None` while empty) and the line under it.
+    pub fn slot(picture: Option<usize>, label: impl Into<String>) -> Card {
+        Card {
+            picture,
+            label: label.into(),
+            resume: false,
+        }
+    }
+
+    /// The resume point: its picture and the line under it (when it was written: "Today
+    /// 4:41 PM"). It goes first on the shelf.
+    pub fn resume(picture: Option<usize>, label: impl Into<String>) -> Card {
+        Card {
+            picture,
+            label: label.into(),
+            resume: true,
+        }
+    }
+}
+
+impl Shelf {
+    /// Where the highlight starts when the shelf opens: the first numbered slot, past the
+    /// resume point (or the resume point, if it is all there is).
+    pub fn first_slot(&self) -> usize {
+        self.cards.iter().position(|c| !c.resume).unwrap_or(0)
+    }
 }
 
 /// The bar along the bottom: the clock, the battery, and the slot cut into its top edge.

@@ -398,21 +398,32 @@ pub const CARD_STEP: f32 = 330.0;
 /// The highlighted card's top.
 pub const CARD_Y: f32 = 190.0;
 
-/// The box of the card `offset` places from the highlighted one (0), if it is on screen.
-pub fn card_box(offset: i32) -> Option<(f32, f32, f32, f32)> {
-    if offset.abs() > 1 {
+/// The space between the resume point and the numbered slots, beyond the cards' usual step.
+pub const RESUME_GAP: f32 = 48.0;
+
+/// The box of card `i` on the shelf, if it is on screen: the highlighted one in the middle,
+/// its neighbours either side, smaller; the resume point a little further from the slots.
+pub fn card_box(s: &Shelf, i: usize) -> Option<(f32, f32, f32, f32)> {
+    let offset = i as i32 - s.at as i32;
+    if offset.abs() > 1 || i >= s.cards.len() {
         return None;
     }
+    let resume = |k: usize| s.cards.get(k).is_some_and(|c| c.resume);
+    let gap = match (resume(i), resume(s.at)) {
+        (true, false) => -RESUME_GAP,
+        (false, true) => RESUME_GAP,
+        _ => 0.0,
+    };
     let (w, h) = if offset == 0 { CARD } else { SIDE_CARD };
-    let cx = W / 2.0 + offset as f32 * CARD_STEP;
+    let cx = W / 2.0 + offset as f32 * CARD_STEP + gap;
     let cy = CARD_Y + CARD.1 / 2.0;
     Some((cx - w / 2.0, cy - h / 2.0, w, h))
 }
 
-/// The card under a touch, as an offset from the highlighted one.
-pub fn card_hit(x: f32, y: f32) -> Option<i32> {
-    (-1..=1).find(|&o| {
-        card_box(o).is_some_and(|(bx, by, bw, bh)| {
+/// The card under a touch, by its place on the shelf.
+pub fn card_hit(s: &Shelf, x: f32, y: f32) -> Option<usize> {
+    (0..s.cards.len()).find(|&i| {
+        card_box(s, i).is_some_and(|(bx, by, bw, bh)| {
             (bx..bx + bw).contains(&x) && (by..by + bh).contains(&y)
         })
     })
@@ -422,9 +433,19 @@ pub fn card_hit(x: f32, y: f32) -> Option<i32> {
 pub fn shelf(s: &Shelf, status: &Status) -> Vec<Draw> {
     let mut out = Vec::new();
     tabs(&mut out, &s.tabs);
-    if !s.cards.is_empty() {
+    // Which slot of how many (the resume point is not one of them; its tag says what it is).
+    let slots = s.cards.iter().filter(|c| !c.resume).count();
+    let counter = match s.cards.get(s.at) {
+        Some(card) if card.resume => String::new(),
+        Some(_) => {
+            let before = s.cards[..s.at].iter().filter(|c| c.resume).count();
+            format!("{} / {slots}", s.at - before + 1)
+        }
+        None => String::new(),
+    };
+    if !counter.is_empty() {
         out.push(text(
-            &format!("{} / {}", s.at + 1, s.cards.len()),
+            &counter,
             (22.0, false),
             (W / 2.0, 120.0),
             0.5,
@@ -432,21 +453,48 @@ pub fn shelf(s: &Shelf, status: &Status) -> Vec<Draw> {
         ));
     }
     for (i, card) in s.cards.iter().enumerate() {
-        let offset = i as i32 - s.at as i32;
-        let Some((x, y, w, h)) = card_box(offset) else {
+        let Some((x, y, w, h)) = card_box(s, i) else {
             continue;
         };
-        let lit = offset == 0;
+        let lit = i == s.at;
         let pad = if lit { 16.0 } else { 14.0 };
         let label_h = if lit { 54.0 } else { 46.0 };
-        out.push(Draw::Round {
-            x,
-            y,
-            w,
-            h,
-            radius: 14.0,
-            colour: if lit { [59, 63, 71] } else { [43, 47, 54] },
-        });
+        if card.resume {
+            // The resume point: an outline round a dark card, not a filled one.
+            out.push(Draw::Round {
+                x,
+                y,
+                w,
+                h,
+                radius: 14.0,
+                colour: [24, 27, 33],
+            });
+            out.push(Draw::Frame {
+                x,
+                y,
+                w,
+                h,
+                radius: 14.0,
+                width: 2.0,
+                colour: if lit { colour::DIM } else { colour::FAINT },
+            });
+            out.push(text(
+                "RESUME",
+                (18.0, true),
+                (x + w / 2.0, y - 30.0),
+                0.5,
+                if lit { colour::DIM } else { colour::FAINT },
+            ));
+        } else {
+            out.push(Draw::Round {
+                x,
+                y,
+                w,
+                h,
+                radius: 14.0,
+                colour: if lit { [59, 63, 71] } else { [43, 47, 54] },
+            });
+        }
         let (px, py, pw, ph) = (x + pad, y + pad, w - 2.0 * pad, h - pad - label_h);
         match card.picture {
             Some(index) => out.push(Draw::Picture {
@@ -599,9 +647,48 @@ mod tests {
         assert_eq!(tab_hit(30.0, 20.0, 5), Some(0));
         assert_eq!(tab_hit(300.0, 20.0, 5), Some(2));
         assert_eq!(tab_hit(300.0, 20.0, 2), None);
-        assert_eq!(card_hit(512.0, 300.0), Some(0));
-        assert_eq!(card_hit(180.0, 300.0), Some(-1));
-        assert_eq!(card_hit(512.0, 600.0), None);
+        let s = Shelf {
+            cards: vec![
+                Card::resume(None, "r"),
+                Card::slot(None, "1"),
+                Card::slot(None, "2"),
+            ],
+            at: 1,
+            ..Shelf::default()
+        };
+        assert_eq!(card_hit(&s, 512.0, 300.0), Some(1));
+        assert_eq!(card_hit(&s, 512.0 + CARD_STEP, 300.0), Some(2));
+        assert_eq!(card_hit(&s, 512.0 - CARD_STEP - RESUME_GAP, 300.0), Some(0));
+        assert_eq!(card_hit(&s, 512.0, 600.0), None);
+    }
+
+    #[test]
+    fn the_resume_point_stands_apart() {
+        let mut s = Shelf {
+            cards: vec![
+                Card::resume(Some(0), "Today 4:41 PM"),
+                Card::slot(None, "1"),
+            ],
+            ..Shelf::default()
+        };
+        s.at = s.first_slot();
+        assert_eq!(s.at, 1);
+        let (rx, ..) = card_box(&s, 0).unwrap();
+        let (sx, ..) = card_box(&s, 1).unwrap();
+        assert_eq!(
+            sx - rx,
+            CARD_STEP + RESUME_GAP - (CARD.0 - SIDE_CARD.0) / 2.0
+        );
+        let labels = |s: &Shelf| -> Vec<String> {
+            texts(&shelf(s, &Status::default()))
+                .into_iter()
+                .map(|t| t.0)
+                .collect()
+        };
+        assert!(labels(&s).contains(&"1 / 1".to_owned()));
+        assert!(labels(&s).contains(&"RESUME".to_owned()));
+        s.at = 0;
+        assert!(!labels(&s).iter().any(|l| l.contains(" / ")));
     }
 
     #[test]
@@ -609,10 +696,7 @@ mod tests {
         let s = Shelf {
             tabs: vec![],
             cards: (0..7)
-                .map(|i| Card {
-                    picture: (i < 3).then_some(i),
-                    label: format!("{}", i + 1),
-                })
+                .map(|i| Card::slot((i < 3).then_some(i), format!("{}", i + 1)))
                 .collect(),
             at: 3,
             hint: String::new(),

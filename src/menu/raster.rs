@@ -248,7 +248,8 @@ impl Canvas {
         }
     }
 
-    /// A picture scaled into a box, nearest pixel; faded towards black for a card aside.
+    /// A picture fitted into a box (its proportions kept, centred), nearest pixel; faded
+    /// towards black for a card aside.
     fn picture(
         &mut self,
         rgba: &[u8],
@@ -257,6 +258,12 @@ impl Canvas {
         (x, y, w, h): (f32, f32, f32, f32),
         faded: bool,
     ) {
+        if pw == 0 || ph == 0 {
+            return;
+        }
+        let fit = (w / pw as f32).min(h / ph as f32);
+        let (fw, fh) = (pw as f32 * fit, ph as f32 * fit);
+        let (x, y, w, h) = (x + (w - fw) / 2.0, y + (h - fh) / 2.0, fw, fh);
         let s = self.scale;
         let (x0, y0, x1, y1) = (
             (x * s) as i32,
@@ -439,6 +446,34 @@ mod tests {
     fn at(c: &Canvas, x: usize, y: usize) -> [u8; 3] {
         let i = (y * c.w + x) * 4;
         [c.px[i], c.px[i + 1], c.px[i + 2]]
+    }
+
+    /// A DS state's two screens stacked (tall) in a wide box: as tall as the box, centred,
+    /// the sides left as they were; a picture of the box's own shape fills it.
+    #[test]
+    fn pictures_keep_their_shape() {
+        let mut c = Canvas::new(1.0);
+        let (pw, ph) = (2, 3);
+        let red = [255u8, 0, 0, 255].repeat(pw * ph);
+        let draw = Draw::Picture {
+            index: 0,
+            x: 100.0,
+            y: 100.0,
+            w: 300.0,
+            h: 150.0,
+            faded: false,
+        };
+        c.draw(&Fonts::new(), &[draw.clone()], |_| {
+            Some((red.as_slice(), pw, ph))
+        });
+        // 150 tall, so 100 wide, from x 200 to 300.
+        assert_eq!(at(&c, 250, 175), [255, 0, 0]);
+        assert_eq!(at(&c, 150, 175), [0, 0, 0]);
+        assert_eq!(at(&c, 350, 175), [0, 0, 0]);
+        let wide = [0u8, 255, 0, 255].repeat(2);
+        c.draw(&Fonts::new(), &[draw], |_| Some((wide.as_slice(), 2, 1)));
+        assert_eq!(at(&c, 105, 175), [0, 255, 0]);
+        assert_eq!(at(&c, 395, 175), [0, 255, 0]);
     }
 
     #[test]

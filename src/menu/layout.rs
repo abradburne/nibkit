@@ -75,7 +75,10 @@ pub enum Draw {
     },
     /// The bar, the slot cut into its top edge.
     Bar { y: f32, slot: Slot },
-    /// One of the app's own pictures (a save state's), scaled into the box; `faded` dims it.
+    /// One of the app's own pictures (a save state's), fitted into the box: as large as it goes
+    /// with its own proportions kept, centred, the box's background showing round it. A
+    /// one-screen picture (GB, GBA) and a DS state's two screens stacked (256 x 384) both fit.
+    /// `faded` dims it.
     Picture {
         index: usize,
         x: f32,

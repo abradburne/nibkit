@@ -79,18 +79,23 @@ pub enum Button {
     Start,
     /// The Select button.
     Select,
-    /// The Menu (Home) button.
+    /// The Menu (Home) button: on nibOS a game saves and quits on it.
     Menu,
+    /// The Back key: a game's own pause menu.
+    Back,
 }
 
 /// The button a desktop keyboard's key stands for, by the key's name as SDL gives it
 /// (`SDL_GetKeyName`): the arrows for the D-pad, X and Z for A and B, S and A for X and Y, Q
-/// and W for L and R, Return for Start, Right Shift or Backspace for Select, Escape for Menu
-/// (RetroArch's defaults, as players know them).
+/// and W for L and R, Return for Start, Right Shift or Backspace for Select (RetroArch's
+/// defaults, as players know them); Escape for Back, which opens a game's pause menu, and Home
+/// for Menu, which saves and quits.
 ///
 /// ```
 /// use nibkit::input::{keyboard, Button};
 /// assert_eq!(keyboard("X"), Some(Button::A));
+/// assert_eq!(keyboard("Escape"), Some(Button::Back));
+/// assert_eq!(keyboard("Home"), Some(Button::Menu));
 /// assert_eq!(keyboard("Left"), Some(Button::Left));
 /// assert_eq!(keyboard("F12"), None);
 /// ```
@@ -108,7 +113,8 @@ pub fn keyboard(key: &str) -> Option<Button> {
         "W" => Button::R,
         "Return" => Button::Start,
         "Right Shift" | "Backspace" => Button::Select,
-        "Escape" => Button::Menu,
+        "Escape" => Button::Back,
+        "Home" => Button::Menu,
         _ => return None,
     })
 }

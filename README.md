@@ -36,7 +36,8 @@ Rust 1.87 or later.
 
 Both screens show in windows (one each, or one with both stacked as the handheld holds them),
 the keyboard stands in for the buttons (the arrows, X and Z for A and B, S and A for X and Y, Q
-and W for L and R, Return for Start, Escape for Menu) as does any gamepad SDL knows, and the
+and W for L and R, Return for Start, Escape for Back, which opens a game's pause menu, and Home
+for Menu, which saves and quits) as does any gamepad SDL knows, and the
 mouse on the bottom screen is a finger. Settings, data and cache go in the platform's own
 folders (`~/Library/Application Support/<app>` on macOS, the XDG folders on Linux); games in
 `Roms` in nibOS's data folder there, or wherever `NIBKIT_ROMS` says. Brightness, the battery,

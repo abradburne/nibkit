@@ -26,7 +26,7 @@ pub struct AppDirs {
 }
 
 impl AppDirs {
-    #[cfg(feature = "nibos")]
+    #[cfg(nibkit_nibos)]
     pub fn new(app: &str) -> AppDirs {
         AppDirs {
             config: xdg("XDG_CONFIG_HOME", ".config").join(app),
@@ -35,7 +35,38 @@ impl AppDirs {
         }
     }
 
-    #[cfg(not(feature = "nibos"))]
+    /// The platform's own folders for apps: `~/Library/Application Support/<app>` (and
+    /// `~/Library/Caches/<app>`) on macOS, `%APPDATA%\\<app>` on Windows, the XDG folders
+    /// elsewhere.
+    #[cfg(nibkit_desktop)]
+    pub fn new(app: &str) -> AppDirs {
+        let home = || PathBuf::from(std::env::var_os("HOME").unwrap_or_default());
+        if cfg!(target_os = "macos") {
+            let library = home().join("Library");
+            AppDirs {
+                config: library.join("Application Support").join(app),
+                data: library.join("Application Support").join(app),
+                cache: library.join("Caches").join(app),
+            }
+        } else if cfg!(windows) {
+            let roaming = std::env::var_os("APPDATA").map_or_else(home, PathBuf::from);
+            let local =
+                std::env::var_os("LOCALAPPDATA").map_or_else(|| roaming.clone(), PathBuf::from);
+            AppDirs {
+                config: roaming.join(app),
+                data: roaming.join(app),
+                cache: local.join(app).join("cache"),
+            }
+        } else {
+            AppDirs {
+                config: xdg("XDG_CONFIG_HOME", ".config").join(app),
+                data: xdg("XDG_DATA_HOME", ".local/share").join(app),
+                cache: xdg("XDG_CACHE_HOME", ".cache").join(app),
+            }
+        }
+    }
+
+    #[cfg(nibkit_stock)]
     pub fn new(_app: &str) -> AppDirs {
         let here = exe_dir();
         AppDirs {
@@ -48,7 +79,7 @@ impl AppDirs {
 
 /// An XDG base directory: the variable, if it is an absolute path, or its default in the home
 /// folder.
-#[cfg_attr(not(feature = "nibos"), allow(dead_code))]
+#[cfg_attr(nibkit_stock, allow(dead_code))]
 fn xdg(var: &str, default: &str) -> PathBuf {
     match std::env::var_os(var) {
         Some(dir) if Path::new(&dir).is_absolute() => PathBuf::from(dir),
@@ -68,13 +99,13 @@ pub fn exe_dir() -> PathBuf {
 /// `GBC`, ...), as the stock OS lays the cards out: on nibOS the ROMS partition of the card it
 /// starts from and the card in TF2.
 pub fn rom_roots() -> Vec<PathBuf> {
-    platform::ROM_ROOTS.iter().map(PathBuf::from).collect()
+    platform::rom_roots()
 }
 
 /// Where games' saves go, a folder per console and one per game in it: `<root>/GBC/<ROM
 /// name>/`. On the ROMS partition, whichever card the game is on.
 pub fn saves_root() -> PathBuf {
-    PathBuf::from(platform::SAVES_ROOT)
+    platform::saves_root()
 }
 
 /// A game's saves folder: `<saves root>/<console>/<ROM file name without the extension>`.
@@ -86,7 +117,7 @@ pub fn saves_dir(root: &Path, console: &str, rom_name: &str) -> PathBuf {
 mod tests {
     use super::*;
 
-    #[cfg(feature = "nibos")]
+    #[cfg(nibkit_nibos)]
     #[test]
     fn xdg_dirs() {
         // The variables are the process's: this test is the only one that sets them.

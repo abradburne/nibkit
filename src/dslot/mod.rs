@@ -40,10 +40,11 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use toml::Value;
 
-/// DSlot's settings file on nibOS: `~/.config/dslot/settings.toml` (`$XDG_CONFIG_HOME`). On
-/// the stock OS DSlot keeps it beside its program, and there is none for an emulator to use.
+/// DSlot's settings file: on nibOS `~/.config/dslot/settings.toml` (`$XDG_CONFIG_HOME`), on a
+/// desktop in DSlot's config folder there. On the stock OS DSlot keeps it beside its program,
+/// and there is none for an emulator to use.
 pub fn settings_file() -> Option<PathBuf> {
-    cfg!(feature = "nibos").then(|| {
+    cfg!(not(nibkit_stock)).then(|| {
         crate::paths::AppDirs::new("dslot")
             .config
             .join("settings.toml")

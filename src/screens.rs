@@ -99,6 +99,10 @@ impl Placement {
 /// the other way round if `swap`. `None` when the displays don't look like the two panels
 /// (a desktop, where an app shows both screens in a window of its own).
 pub fn place(displays: &[Rect], swap: bool) -> Option<Placement> {
+    // On a desktop there are no panels, however the monitors are arranged.
+    if cfg!(nibkit_desktop) {
+        return None;
+    }
     let first = *displays.first()?;
     let union = displays.iter().fold(first, |a, &b| a.union(b));
     // Both panels side by side, as against a desktop monitor.
@@ -150,15 +154,107 @@ pub fn place(displays: &[Rect], swap: bool) -> Option<Placement> {
     })
 }
 
+/// How an app shows both screens on a desktop, in windows of its own (where [`place`] finds
+/// no panels).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Windows {
+    /// A window for each screen, both this size.
+    Two { size: (u32, u32) },
+    /// One window this size with both screens in it, the top one above the bottom one and a
+    /// gap between, as the handheld holds them; each screen's place in the window.
+    Stacked {
+        size: (u32, u32),
+        top: Rect,
+        bottom: Rect,
+    },
+}
+
+/// The gap between the screens in a [`Windows::Stacked`] window, at scale 1: the hinge.
+pub const HINGE: u32 = 32;
+
+/// Windows for both screens on a desktop at `scale` times the panels' size (1.0 is 1024 x
+/// 768 each; 0.5 suits a laptop): one each, or one with both stacked.
+///
+/// ```
+/// use nibkit::screens::{desktop_windows, Rect, Windows};
+/// match desktop_windows(true, 0.5) {
+///     Windows::Stacked { size, top, bottom } => {
+///         assert_eq!(size, (512, 768 + 16));
+///         assert_eq!((top, bottom), (Rect::new(0, 0, 512, 384), Rect::new(0, 400, 512, 384)));
+///     }
+///     Windows::Two { .. } => unreachable!(),
+/// }
+/// ```
+pub fn desktop_windows(stacked: bool, scale: f32) -> Windows {
+    let px = |v: u32| ((v as f32 * scale).round() as u32).max(1);
+    let (w, h) = (px(WIDTH), px(HEIGHT));
+    if !stacked {
+        return Windows::Two { size: (w, h) };
+    }
+    let gap = px(HINGE);
+    Windows::Stacked {
+        size: (w, 2 * h + gap),
+        top: Rect::new(0, 0, w, h),
+        bottom: Rect::new(0, (h + gap) as i32, w, h),
+    }
+}
+
+impl Rect {
+    /// A point in the window's pixels as a point on the panel this rectangle shows (1024 x
+    /// 768 units), or `None` outside it: the mouse on a desktop's bottom screen, as a touch.
+    ///
+    /// ```
+    /// use nibkit::screens::Rect;
+    /// let bottom = Rect::new(0, 400, 512, 384); // half size, under the top screen
+    /// assert_eq!(bottom.panel_point(256, 592), Some((512.0, 384.0)));
+    /// assert_eq!(bottom.panel_point(256, 100), None);
+    /// ```
+    pub fn panel_point(&self, x: i32, y: i32) -> Option<(f32, f32)> {
+        let inside = (self.x..self.x + self.w as i32).contains(&x)
+            && (self.y..self.y + self.h as i32).contains(&y);
+        inside.then(|| {
+            (
+                (x - self.x) as f32 * WIDTH as f32 / self.w as f32,
+                (y - self.y) as f32 * HEIGHT as f32 / self.h as f32,
+            )
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn desktop() {
+        assert_eq!(
+            desktop_windows(false, 1.0),
+            Windows::Two { size: (1024, 768) }
+        );
+        let Windows::Stacked { size, top, bottom } = desktop_windows(true, 1.0) else {
+            panic!("stacked");
+        };
+        assert_eq!(size, (1024, 768 * 2 + HINGE));
+        assert_eq!(top.panel_point(0, 0), Some((0.0, 0.0)));
+        assert_eq!(
+            bottom.panel_point(1023, 767 + 768 + HINGE as i32),
+            Some((1023.0, 767.0))
+        );
+        // The hinge is neither screen.
+        assert_eq!(bottom.panel_point(10, 770), None);
+        assert_eq!(top.panel_point(10, 770), None);
+    }
 
     #[test]
     fn panels() {
         // A desktop: no placement, the app draws both screens itself.
         assert_eq!(place(&[Rect::new(0, 0, 1920, 1080)], false), None);
         assert_eq!(place(&[], false), None);
+        if cfg!(nibkit_desktop) {
+            let two = [Rect::new(0, 0, 1024, 768), Rect::new(1024, 0, 1024, 768)];
+            assert_eq!(place(&two, false), None);
+            return;
+        }
         match LAYOUT {
             Layout::PerPanel => {
                 // SDL's order on nibOS: display 0 is DSI-1, the bottom panel, on the left.

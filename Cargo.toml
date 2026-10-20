@@ -14,6 +14,7 @@ repository = "https://github.com/abradburne/nibos"
 default = ["nibos"]
 nibos = []
 stock = []
+desktop = []
 dslot = []
 # The menu every app shows on the touch screen, as DSlot draws it (no dependencies); with
 # `menu-raster`, drawing it into a picture in Roboto Condensed (fontdue).

@@ -34,13 +34,13 @@ impl Pointer {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(not(nibkit_desktop))]
 pub use linux::Panel;
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(nibkit_desktop)]
 pub struct Panel;
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(nibkit_desktop)]
 impl Panel {
     pub fn open() -> Option<Panel> {
         None
@@ -48,7 +48,7 @@ impl Panel {
     pub fn poll(&mut self, _out: &mut Vec<Pointer>) {}
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(not(nibkit_desktop))]
 mod linux {
     use super::Pointer;
     use std::ffi::CString;

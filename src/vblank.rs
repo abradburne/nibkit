@@ -17,7 +17,7 @@ use std::time::Duration;
 
 /// The first KMS card, opened for asking about vblanks.
 pub struct Vblank {
-    #[cfg(target_os = "linux")]
+    #[cfg(not(nibkit_desktop))]
     fd: std::os::fd::OwnedFd,
 }
 
@@ -29,7 +29,7 @@ fn pipe(screen: Screen) -> u32 {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(not(nibkit_desktop))]
 mod drm {
     /// union drm_wait_vblank (drm.h): the request, then the reply in the same place.
     #[repr(C)]
@@ -53,7 +53,7 @@ mod drm {
 }
 
 impl Vblank {
-    #[cfg(target_os = "linux")]
+    #[cfg(not(nibkit_desktop))]
     pub fn open() -> io::Result<Vblank> {
         use std::os::fd::FromRawFd;
         for i in 0..4 {
@@ -71,7 +71,7 @@ impl Vblank {
         Err(io::Error::new(io::ErrorKind::NotFound, "no KMS card"))
     }
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(nibkit_desktop)]
     pub fn open() -> io::Result<Vblank> {
         Err(io::Error::new(
             io::ErrorKind::Unsupported,
@@ -80,7 +80,7 @@ impl Vblank {
     }
 
     /// Waits for `screen`'s next vblank. Returns when it was, on CLOCK_MONOTONIC.
-    #[cfg(target_os = "linux")]
+    #[cfg(not(nibkit_desktop))]
     pub fn wait(&self, screen: Screen) -> io::Result<Duration> {
         use std::os::fd::AsRawFd;
         let pipe = pipe(screen);
@@ -101,7 +101,7 @@ impl Vblank {
         Ok(Duration::new(v.tval_sec as u64, v.tval_usec as u32 * 1000))
     }
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(nibkit_desktop)]
     pub fn wait(&self, screen: Screen) -> io::Result<Duration> {
         let _ = pipe(screen);
         Err(io::Error::new(

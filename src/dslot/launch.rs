@@ -6,9 +6,13 @@ use std::path::{Path, PathBuf};
 
 /// The folders DSlot reads descriptions from, in order: a file replaces one of the same name in
 /// an earlier folder. On nibOS: packages', the administrator's, the user's. On the stock OS:
-/// DSlot's own folder on either card.
+/// DSlot's own folder on either card. On a desktop: the user's (DSlot's config folder).
 pub fn description_dirs() -> Vec<PathBuf> {
-    #[cfg(feature = "nibos")]
+    #[cfg(nibkit_desktop)]
+    {
+        vec![crate::paths::AppDirs::new("dslot").config.join("emulators")]
+    }
+    #[cfg(nibkit_nibos)]
     {
         let user = crate::paths::AppDirs::new("dslot").config.join("emulators");
         vec![
@@ -17,7 +21,7 @@ pub fn description_dirs() -> Vec<PathBuf> {
             user,
         ]
     }
-    #[cfg(not(feature = "nibos"))]
+    #[cfg(nibkit_stock)]
     {
         ["/mnt/mmc", "/mnt/sdcard"]
             .iter()

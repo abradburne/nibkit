@@ -48,6 +48,55 @@ pub const MENU_ON_RELEASE: bool = platform::MENU_ON_RELEASE;
 /// "Sleep" keycode; a translating sdl2-compat would say "AC Back". Bind both.
 pub const BACK_KEYCODES: &[&str] = &["Sleep", "AC Back"];
 
+/// One of the DS+'s buttons, by its label.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub enum Button {
+    Up,
+    Down,
+    Left,
+    Right,
+    A,
+    B,
+    X,
+    Y,
+    L,
+    R,
+    Start,
+    Select,
+    /// The Menu (Home) button.
+    Menu,
+}
+
+/// The button a desktop keyboard's key stands for, by the key's name as SDL gives it
+/// (`SDL_GetKeyName`): the arrows for the D-pad, X and Z for A and B, S and A for X and Y, Q
+/// and W for L and R, Return for Start, Right Shift or Backspace for Select, Escape for Menu
+/// (RetroArch's defaults, as players know them).
+///
+/// ```
+/// use nibkit::input::{keyboard, Button};
+/// assert_eq!(keyboard("X"), Some(Button::A));
+/// assert_eq!(keyboard("Left"), Some(Button::Left));
+/// assert_eq!(keyboard("F12"), None);
+/// ```
+pub fn keyboard(key: &str) -> Option<Button> {
+    Some(match key {
+        "Up" => Button::Up,
+        "Down" => Button::Down,
+        "Left" => Button::Left,
+        "Right" => Button::Right,
+        "X" => Button::A,
+        "Z" => Button::B,
+        "S" => Button::X,
+        "A" => Button::Y,
+        "Q" => Button::L,
+        "W" => Button::R,
+        "Return" => Button::Start,
+        "Right Shift" | "Backspace" => Button::Select,
+        "Escape" => Button::Menu,
+        _ => return None,
+    })
+}
+
 /// A held button repeating, as a held D-pad or stick moves through a list: the press acts at
 /// once (the caller does that), then after `first` the button repeats every `every`, twice as
 /// often once it has been held [`Repeat::FASTER_AFTER`]. Repeats are never stored up: if the
@@ -181,7 +230,7 @@ mod tests {
 
     #[test]
     fn labels() {
-        // A and B are swapped on both systems; X and Y on the stock OS only.
+        // A and B are swapped on every system; X and Y on the stock OS only.
         assert_eq!(printed(Face::B), Face::A);
         assert_eq!(printed(Face::A), Face::B);
         for f in [Face::A, Face::B, Face::X, Face::Y] {

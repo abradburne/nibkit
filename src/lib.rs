@@ -24,11 +24,6 @@
 //! lacks something nibOS has (each screen's brightness, a volume DSlot can set), the call says
 //! so (`None`) rather than guessing.
 
-#[cfg(all(feature = "nibos", feature = "stock"))]
-compile_error!("nibkit: build for one system, feature `nibos` (the default) or `stock`, not both");
-#[cfg(not(any(feature = "nibos", feature = "stock")))]
-compile_error!("nibkit: build for a system: feature `nibos` (the default) or `stock`");
-
 pub mod audio;
 pub mod backlight;
 pub mod battery;

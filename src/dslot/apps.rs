@@ -7,7 +7,7 @@
 //! command = ["./template", "--verbose"]           # the first word relative to the folder,
 //!                                                 # absolute, or found on PATH
 //! icon = "icon.png"                               # optional; icon.png if left out
-//! runs_on = ["nibos"]                             # "nibos", "stock"; nibOS only if left out
+//! runs_on = ["nibos"]                   # "nibos", "stock", "desktop"; nibOS only if left out
 //! [env]                                           # optional
 //! ```
 //!
@@ -54,9 +54,11 @@ impl App {
         if let Some(other) = app
             .runs_on
             .iter()
-            .find(|s| !["nibos", "stock"].contains(&s.as_str()))
+            .find(|s| !["nibos", "stock", "desktop"].contains(&s.as_str()))
         {
-            return Err(format!("runs_on: no system \"{other}\" (nibos, stock)"));
+            return Err(format!(
+                "runs_on: no system \"{other}\" (nibos, stock, desktop)"
+            ));
         }
         Ok(app)
     }
@@ -197,12 +199,12 @@ mod tests {
         app(
             &tf1,
             "zeta",
-            "name = \"Zeta\"\ncommand = [\"./zeta\"]\nruns_on = [\"nibos\", \"stock\"]\n",
+            "name = \"Zeta\"\ncommand = [\"./zeta\"]\nruns_on = [\"nibos\", \"stock\", \"desktop\"]\n",
         );
         app(
             &tf2,
             "alpha",
-            "name = \"alpha\"\ncommand = [\"./alpha\"]\nruns_on = [\"nibos\", \"stock\"]\n",
+            "name = \"alpha\"\ncommand = [\"./alpha\"]\nruns_on = [\"nibos\", \"stock\", \"desktop\"]\n",
         );
         app(&tf2, "broken", "name = ");
         std::fs::write(tf2.join("APPS/alpha/icon.png"), b"").unwrap();

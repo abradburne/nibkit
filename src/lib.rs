@@ -264,6 +264,34 @@ pub unsafe extern "C" fn nib_menu_card(
     height: c_int,
 ) {
     // SAFETY: the caller's promise.
+    unsafe { add_card(m, label, rgba, width, height, false) }
+}
+
+/// # Safety
+/// As `nib_menu_card`.
+#[no_mangle]
+pub unsafe extern "C" fn nib_menu_resume_card(
+    m: *mut NibMenu,
+    label: *const c_char,
+    rgba: *const u8,
+    width: c_int,
+    height: c_int,
+) {
+    // SAFETY: the caller's promise.
+    unsafe { add_card(m, label, rgba, width, height, true) }
+}
+
+/// # Safety
+/// As `nib_menu_card`.
+unsafe fn add_card(
+    m: *mut NibMenu,
+    label: *const c_char,
+    rgba: *const u8,
+    width: c_int,
+    height: c_int,
+    resume: bool,
+) {
+    // SAFETY: the caller's promise.
     let label = unsafe { text(label) };
     let (w, h) = (width.max(0) as usize, height.max(0) as usize);
     let picture = (!rgba.is_null() && w > 0 && h > 0)
@@ -276,9 +304,10 @@ pub unsafe extern "C" fn nib_menu_card(
                 m.pictures.push((p, w, h));
                 m.pictures.len() - 1
             });
-            m.shelf.cards.push(Card {
-                picture: index,
-                label,
+            m.shelf.cards.push(if resume {
+                Card::resume(index, label)
+            } else {
+                Card::slot(index, label)
             });
         })
     }
@@ -340,6 +369,14 @@ pub unsafe extern "C" fn nib_menu_set_row(m: *mut NibMenu, row: c_int) {
 pub unsafe extern "C" fn nib_menu_card_at(m: *const NibMenu) -> c_int {
     // SAFETY: the caller's promise.
     unsafe { m.as_ref() }.map_or(0, |m| m.shelf.at as c_int)
+}
+
+/// # Safety
+/// `m` is a live `NibMenu`.
+#[no_mangle]
+pub unsafe extern "C" fn nib_menu_first_slot(m: *const NibMenu) -> c_int {
+    // SAFETY: the caller's promise.
+    unsafe { m.as_ref() }.map_or(0, |m| m.shelf.first_slot() as c_int)
 }
 
 /// # Safety
@@ -678,18 +715,27 @@ mod tests {
         let picture = vec![200u8; 160 * 144 * 4];
         unsafe {
             nib_menu_begin(m, std::ptr::null(), c("A  load").as_ptr());
+            nib_menu_resume_card(m, c("Today 4:41 PM").as_ptr(), picture.as_ptr(), 160, 144);
             nib_menu_card(m, c("1").as_ptr(), picture.as_ptr(), 160, 144);
             nib_menu_card(m, c("2").as_ptr(), std::ptr::null(), 0, 0);
+            assert_eq!(nib_menu_first_slot(m), 1);
+            nib_menu_set_card(m, nib_menu_first_slot(m));
             assert_eq!(nib_menu_key(m, 3).kind, 0);
-            assert_eq!(nib_menu_card_at(m), 1);
+            assert_eq!(nib_menu_card_at(m), 2);
             assert_eq!(
                 nib_menu_key(m, 6),
                 NibEffect {
                     kind: 6,
-                    index: 1,
+                    index: 2,
                     step: 0,
                     key: 6
                 }
+            );
+            nib_menu_set_card(m, 0);
+            assert_eq!(
+                nib_menu_key(m, 6).kind,
+                0,
+                "X does nothing on the resume card"
             );
             let px = nib_menu_render(m, std::ptr::null_mut(), std::ptr::null_mut());
             assert!(!px.is_null());

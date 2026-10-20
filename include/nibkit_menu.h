@@ -89,6 +89,12 @@ void nib_menu_heading(NibMenu *m, const char *label);
 void nib_menu_row(NibMenu *m, const char *label, int value_kind, const char *text, int number);
 /* A card on a shelf: a picture (RGBA, rows top first; NULL for an empty slot) and its label. */
 void nib_menu_card(NibMenu *m, const char *label, const uint8_t *rgba, int width, int height);
+/* The resume point (written when the game was left), added before the slots: drawn apart from
+ * them and differently, its label when it was written ("Today 4:41 PM"). A loads it; X and Y
+ * do nothing on it. Open the shelf on nib_menu_first_slot(m), the first numbered slot. */
+void nib_menu_resume_card(NibMenu *m, const char *label, const uint8_t *rgba, int width,
+                          int height);
+int nib_menu_first_slot(const NibMenu *m);
 /* The bar: the clock as shown, the battery (-1 if none) and whether it is charging, and the slot
  * in the bar's edge: 1 for the DS card slot, 2 for slot-2 with carts `cart_width` wide (GBA 560). */
 void nib_menu_status(NibMenu *m, const char *clock, int battery, int charging, int slot, float cart_width);

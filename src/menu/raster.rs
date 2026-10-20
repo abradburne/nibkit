@@ -463,7 +463,7 @@ mod tests {
             h: 150.0,
             faded: false,
         };
-        c.draw(&Fonts::new(), &[draw.clone()], |_| {
+        c.draw(&Fonts::new(), std::slice::from_ref(&draw), |_| {
             Some((red.as_slice(), pw, ph))
         });
         // 150 tall, so 100 wide, from x 200 to 300.

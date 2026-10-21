@@ -2,6 +2,10 @@
 
 ## 0.1.0 (unreleased)
 
+- `menu::keyboard`: the on-screen keyboard, for a passphrase, a PIN or a search: letters,
+  symbols, or a number pad for digits; laid out as `Draw`s like the menu; the D-pad and A to
+  type, B to delete, Y to show a secret, L shift, R symbols, Start done, Select cancel, or a tap
+  on a key.
 - `net::wifi` and `net::bluetooth` (feature `net-control`, zbus): Wi-Fi through iwd's D-Bus API
   (status, scan, the networks in range with security and signal, joining with a passphrase
   through an agent, disconnecting, known networks, forgetting) and Bluetooth through BlueZ's

@@ -10,6 +10,7 @@
 //!   1024 × 768 screen in DSlot's sizes and colours ([`colour`]).
 //! - [`Menu::key`], [`Menu::touch`] (and the same on [`Shelf`]) move the highlight with the
 //!   buttons and find what a finger touched, saying what to do as an [`Effect`].
+//! - [`keyboard`] is the on-screen keyboard, for a passphrase, a PIN or a search.
 //! - [`top`] lays out the top screen while the menu is open: the game paused, or a save
 //!   state's picture and details.
 //! - [`raster`] (feature `menu-raster`) draws the [`Draw`]s into an RGBA picture in Roboto
@@ -30,6 +31,7 @@
 //! ```
 
 mod input;
+pub mod keyboard;
 pub mod layout;
 mod model;
 #[cfg(feature = "menu-raster")]

@@ -3,6 +3,7 @@
 //! DSlot's settings and an emulator's declared options (`options`), brightness, the clock, the
 //! battery and the volume (`system`).
 
+mod connections;
 mod options;
 mod system;
 
@@ -121,7 +122,7 @@ impl NibMenu {
     }
 
     /// Keeps the highlight on a row (or card) that exists, in view.
-    fn settle(&mut self) {
+    pub(crate) fn settle(&mut self) {
         if self.menu.row >= self.menu.rows.len() {
             self.menu.row = self.menu.rows.len().saturating_sub(1);
         }

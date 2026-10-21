@@ -211,6 +211,36 @@ int nib_battery(int *charging);
 int nib_volume_get(void);
 void nib_volume_set(int percent);
 
+/* ---- The Connections page -------------------------------------------------------------------
+ *
+ * Wi-Fi and Bluetooth on or off and the paired Bluetooth devices, each connected or disconnected
+ * with one press (its battery shown where it says), as DSlot's Wi-Fi and Bluetooth pages show
+ * them: a page of its own in a pause menu. Keep one while the menu is open:
+ *
+ *     NibConnections *c = nib_connections_new();          // NULL: none here (the stock OS)
+ *     // filling the page, each time it is shown:
+ *     nib_menu_begin(m, nib_connections_title(c), nib_connections_hint());
+ *     nib_menu_tab(m, "Play", 0); ... nib_menu_tab(m, "Connections", 1);
+ *     int first = nib_connections_fill(c, m);
+ *     // on NIB_EFFECT_CHOOSE or NIB_EFFECT_CHANGE for row `index`:
+ *     nib_connections_act(c, e.index - first);
+ *     // the menu closing:
+ *     nib_connections_free(c);
+ *
+ * The work (D-Bus to iwd and BlueZ) is done on a thread of its own; fill the page again every
+ * frame or so to show how it went. */
+typedef struct NibConnections NibConnections;
+NibConnections *nib_connections_new(void);
+void nib_connections_free(NibConnections *c);
+/* What is being done ("Connecting..."), what it came to, or the page's name; valid until the
+ * next call on `c`. */
+const char *nib_connections_title(NibConnections *c);
+const char *nib_connections_hint(void);
+/* Adds the page's rows to `m`; returns the index of the first. */
+int nib_connections_fill(NibConnections *c, NibMenu *m);
+/* Acts on the page's row `row` (counted from its first): 1 if it did something. */
+int nib_connections_act(NibConnections *c, int row);
+
 #ifdef __cplusplus
 }
 #endif

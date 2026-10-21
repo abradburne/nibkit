@@ -6,6 +6,9 @@ written in C++ (DSperate) shows the same menu as DSlot and inkdot through it:
 - **The menu** (nibkit's `menu`): it fills a page a call at a time, passes on the buttons and
   touches, and draws the RGBA picture it gets back on the bottom screen; the top screen while
   paused, or on a shelf of save states, the same way.
+- **The Connections page:** Wi-Fi and Bluetooth on or off and the paired devices to connect, as
+  DSlot shows them, for a pause menu: `nib_connections_new`, `_fill`, `_act` (nibOS; NULL on the
+  stock OS).
 - **What the pages show:** DSlot's settings file and the emulator's options as its description
   declares them (values, "Use NDS (2x)", stepping, the command-line words), and the System page's
   brightness, clock, battery and volume.

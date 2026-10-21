@@ -15,7 +15,7 @@ crate-type = ["staticlib", "rlib"]
 # The system, as nibkit's: nibOS (the default) or the stock OS.
 [features]
 default = ["nibos"]
-nibos = ["nibkit/nibos"]
+nibos = ["nibkit/nibos", "nibkit/net-control"]
 stock = ["nibkit/stock"]
 
 [dependencies]

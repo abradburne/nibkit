@@ -52,6 +52,9 @@ pub const BACKLIGHTS: Option<(&str, &str)> =
     Some(("/run/nibos/backlight/top", "/run/nibos/backlight/bottom"));
 /// Where nibOS says how dark a screen may go (NIBOS_BACKLIGHT_MIN_PERCENT).
 pub const BOARD_CONF: &str = "/usr/lib/nibos/board.conf";
+/// Folders of apps installed with the system (each app a folder, as in `Roms/APPS`).
+#[cfg_attr(not(feature = "dslot"), allow(dead_code))]
+pub const SYSTEM_APPS: &[&str] = &["/usr/share/dslot/apps"];
 /// Saves the screens' brightness for the next boot.
 pub const BACKLIGHT_SAVE: Option<&[&str]> = Some(&["nibos-backlight", "save"]);
 /// The battery and charger as nibos-hw names them: links to their power supplies.

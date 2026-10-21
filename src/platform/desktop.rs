@@ -62,6 +62,9 @@ pub fn saves_root() -> PathBuf {
 
 pub const BACKLIGHTS: Option<(&str, &str)> = None;
 pub const BOARD_CONF: &str = "";
+/// Folders of apps installed with the system (each app a folder, as in `Roms/APPS`).
+#[cfg_attr(not(feature = "dslot"), allow(dead_code))]
+pub const SYSTEM_APPS: &[&str] = &[];
 pub const BACKLIGHT_SAVE: Option<&[&str]> = None;
 pub const BATTERY: Option<(&str, &str)> = None;
 pub const BATTERY_PROTECT: Option<&[&str]> = None;

@@ -100,11 +100,14 @@ pub struct Found {
     pub icon: Option<PathBuf>,
 }
 
-/// The apps in `<root>/APPS` for each of `roots` (the cards' `Roms` folders), those that run on
-/// this system, sorted by name. An `app.toml` that can't be read is logged and passed over.
+/// The apps in `<root>/APPS` for each of `roots` (the cards' `Roms` folders), and those
+/// installed with the system (on nibOS, packages' apps in `/usr/share/dslot/apps`), those that
+/// run on this system, sorted by name. An `app.toml` that can't be read is logged and passed
+/// over.
 pub fn apps(roots: &[PathBuf]) -> Vec<Found> {
     let mut found = Vec::new();
-    for dir in roots.iter().map(|r| r.join("APPS")) {
+    let system = crate::platform::SYSTEM_APPS.iter().map(PathBuf::from);
+    for dir in roots.iter().map(|r| r.join("APPS")).chain(system) {
         let Ok(entries) = std::fs::read_dir(&dir) else {
             continue;
         };

@@ -152,9 +152,13 @@ pub fn set_wifi(on: bool) {
 }
 
 /// Brings nibOS's network up (both radios' daemons, iwd and BlueZ: `nib net up`), where its
-/// mode left it down, and returns when it has. Wi-Fi stays as its switch has it.
+/// mode left it down, and returns when it has. Wi-Fi stays off if it was: its switch is set
+/// off first, which `nib net up` keeps.
 pub fn network_up() {
     if let Some(nib) = platform::NETWORK {
+        if wifi() == Some(false) {
+            run(Command::new(nib).args(["wifi", "off"]));
+        }
         run(Command::new(nib).args(["net", "up"]));
         crate::net::refresh();
     }

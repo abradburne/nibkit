@@ -217,6 +217,19 @@ mod real {
                 Err(RecvTimeoutError::Timeout) => None,
                 Err(RecvTimeoutError::Disconnected) => return,
             };
+            // nibOS turns its radios on and off together (`nib net`, the Wi-Fi switch): Bluetooth
+            // on while they are off brings them up first, and waits for the adapter.
+            if what == Some(Do::Power(true)) && bt.as_ref().is_none_or(|b| b.powered().is_err()) {
+                crate::device::set_wifi(true);
+                bt = None;
+                for _ in 0..20 {
+                    if let Ok(b) = Bluetooth::open().and_then(|b| b.powered().map(|_| b)) {
+                        bt = Some(b);
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(500));
+                }
+            }
             if bt.is_none() {
                 bt = Bluetooth::open().ok();
             }

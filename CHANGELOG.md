@@ -2,6 +2,8 @@
 
 ## 0.1.0 (unreleased)
 
+- `dslot::apps` also lists the apps installed with the system (`platform::SYSTEM_APPS`:
+  `/usr/share/dslot/apps` on nibOS), for a package's app, which can't write to the cards.
 - `net`: the radios for a status bar: Wi-Fi off, connecting or connected (with signal bars),
   Bluetooth off, on or connected (how many, and whether one is a gamepad). Read from sysfs,
   `iw` and BlueZ's `Powered`, never hard: `net::Monitor` reads them on a thread every few

@@ -55,6 +55,8 @@ the speakers' tuning, the network and powering off are the handheld's: `None`, o
 | `backlight` | `get(Screen)`, `set(Screen, percent)`, `save()`, `set_off(Screen, bool)`, `watch()` (changes made by the shortcut, `nib` or other apps): each screen's brightness above nibOS's floor, with its perceptual curve. `None` on the stock OS. |
 | `battery` | `read()` (charge, state, plugged in, `time_to_full()`), `protect()`, `set_protect(bool)`, `watch()`: the battery by the RK817's count, and battery protect (stop charging at about 80%, by a lower charge voltage). `None` on the stock OS. |
 | `device` | `volume()`, `set_volume()` (PipeWire, through `pactl`), `wifi()`, `set_wifi()` (`nib net`), `sleep()`, `restart()`, `power_off()`. |
+| `net` | The radios for a status bar: `radios()` reads Wi-Fi (off, connecting, connected with signal bars: sysfs, `iw`) and Bluetooth (off, on, connected: how many devices, whether one is a gamepad: sysfs, BlueZ's `Powered`); `Monitor::start(every)` reads them on a thread of its own, `now()` gives the last. `Unknown` on the stock OS and a desktop. |
+| `clock` | `hour12()`: nibOS's 12- or 24-hour preference (`~/.config/nibos/prefs.toml`, else the locale's habit); `format(h, m, hour12)`. |
 | `power` | The power menu's request (SIGUSR1 on a long press of power, nibOS): `watch()`, then `take()` once a frame. **A program DSlot starts saves its auto-resume state and exits on SIGTERM**: that is how a game is put away for the menu. |
 | `audio` | `ADVICE`: the sample rate and buffer size that suit the sound server: PipeWire at 48 kHz on nibOS; on the stock OS PulseAudio behind an ALSA shim that wants big buffers. |
 | `paths` | `AppDirs::new("app")`: config, data and cache folders (XDG on nibOS; beside the program on the stock OS). `rom_roots()`, `saves_root()`, `saves_dir()`. |
@@ -109,6 +111,10 @@ per game, and passes when they are set) and actions on a game's files. `nibkit::
 and checks those files the way DSlot does: `Emulators::load(&description_dirs())`. The format
 and how DSlot starts a program (it lets go of both screens first, takes them back when the
 program exits): `docs/emulators.md` in the DSlot repository.
+
+Apps (`dslot::apps`) are folders with an `app.toml`, in `Roms/APPS` on either card and, on
+nibOS, in `/usr/share/dslot/apps` for apps a package installs (`platform::SYSTEM_APPS`):
+`docs/apps.md` in the DSlot repository.
 
 ## Building and testing
 

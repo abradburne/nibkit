@@ -217,10 +217,10 @@ mod real {
                 Err(RecvTimeoutError::Timeout) => None,
                 Err(RecvTimeoutError::Disconnected) => return,
             };
-            // nibOS turns its radios on and off together (`nib net`, the Wi-Fi switch): Bluetooth
-            // on while they are off brings them up first, and waits for the adapter.
+            // BlueZ isn't running while nibOS's network is down (its modes bring it up on
+            // demand): Bluetooth on brings it up first, and waits for the adapter.
             if what == Some(Do::Power(true)) && bt.as_ref().is_none_or(|b| !b.present()) {
-                crate::device::set_wifi(true);
+                crate::device::network_up();
                 bt = None;
                 for _ in 0..20 {
                     if let Ok(b) = Bluetooth::open().and_then(|b| b.powered().map(|_| b)) {

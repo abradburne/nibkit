@@ -65,7 +65,7 @@ pub const BATTERY_PROTECT: Option<&[&str]> = Some(&["nib", "battery", "protect"]
 pub const AMP_TUNING: Option<&str> = Some("/usr/lib/nibos/nib-audio");
 /// The volume: PipeWire's PulseAudio server, through pactl.
 pub const VOLUME: bool = true;
-/// `nib net up|down|status`.
+/// `nib wifi on|off|status` (the Wi-Fi switch), `nib net up` (the network).
 pub const NETWORK: Option<&str> = Some("nib");
 /// Wi-Fi (iwd) and Bluetooth (BlueZ), whose state `net` reads.
 pub const RADIOS: bool = true;

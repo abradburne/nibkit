@@ -156,7 +156,7 @@ impl Bluetooth {
 
     /// The adapter, as BlueZ lists it now: [`Error::Off`] while there is none (BlueZ stopped,
     /// or just started and not yet found it). Looked up every time, never kept: BlueZ is
-    /// stopped and started with nibOS's other radio (`nib net`).
+    /// stopped and started with nibOS's network (`nib net`).
     fn adapter(&self) -> Result<OwnedObjectPath, Error> {
         let found = self.objects().map_err(|_| Error::Off)?;
         let mut adapters: Vec<OwnedObjectPath> = found

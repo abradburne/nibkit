@@ -2,6 +2,10 @@
 
 ## 0.1.0 (unreleased)
 
+- `device::set_wifi` and `wifi` use nibOS's Wi-Fi switch, `nib wifi on|off|status` (the Wi-Fi
+  radio alone, by rfkill; Bluetooth carries on), falling back to `nib net status` on an older
+  nibOS. `device::network_up` (`nib net up`) brings BlueZ up for Bluetooth where the network
+  mode left it down, without turning Wi-Fi on.
 - `menu::glyphs` and `Value::Status`: a row's state in words and then small pictures (a
   network's signal as the status bar's fan of arcs, bright and dim, a lock, a check; a
   device's battery as the battery icon), drawn by `glyphs::render` at the text's height, so

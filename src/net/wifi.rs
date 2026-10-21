@@ -1,7 +1,7 @@
 //! Wi-Fi, through iwd's D-Bus API (feature `net-control`): the networks in range with their
 //! signal and security, joining one (with its passphrase, which iwd asks an agent of ours for),
 //! the known networks and forgetting one. Turning the radio off and on is `device::set_wifi`
-//! (nibOS's `nib net`, which stops and starts iwd).
+//! (nibOS's `nib wifi`, which blocks and unblocks the Wi-Fi radio).
 //!
 //! Every call blocks while iwd works (a scan takes a few seconds, joining up to half a minute):
 //! make them from a thread of your own.

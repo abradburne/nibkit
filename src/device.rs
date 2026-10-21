@@ -117,28 +117,46 @@ fn parse_volume(text: &str) -> Option<u8> {
     percent.trim_end_matches('%').parse().ok()
 }
 
-/// Whether the network (Wi-Fi and Bluetooth) is up.
-pub fn wifi() -> Option<bool> {
-    let nib = platform::NETWORK?;
-    let out = Command::new(nib).args(["net", "status"]).output().ok()?;
-    let first = String::from_utf8_lossy(&out.stdout)
-        .lines()
-        .next()?
-        .trim()
-        .to_owned();
-    Some(first == "up")
+/// The first line `nib <words>` prints, if it ran and succeeded.
+fn nib(words: &[&str]) -> Option<String> {
+    let out = Command::new(platform::NETWORK?).args(words).output().ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    Some(text.lines().next()?.trim().to_owned())
 }
 
-/// Brings the network up or down. Starting it takes a moment, so this returns at once and
-/// does it in the background.
+/// Whether Wi-Fi is on: nibOS's switch (`nib wifi`, which blocks the Wi-Fi radio alone and
+/// leaves Bluetooth be), or, on a nibOS older than it, whether the network is up.
+pub fn wifi() -> Option<bool> {
+    match nib(&["wifi", "status"]) {
+        Some(status) => Some(status == "on"),
+        None => Some(nib(&["net", "status"])? == "up"),
+    }
+}
+
+/// Turns Wi-Fi on or off with nibOS's switch (`nib wifi`: off blocks the Wi-Fi radio alone,
+/// Bluetooth carries on, and the choice is kept across restarts; on brings the network up
+/// first where it isn't). It takes a moment, so this returns at once and does it in the
+/// background.
 pub fn set_wifi(on: bool) {
     if let Some(nib) = platform::NETWORK {
-        let way = if on { "up" } else { "down" };
+        let way = if on { "on" } else { "off" };
         std::thread::spawn(move || {
-            run(Command::new(nib).args(["net", way]));
+            run(Command::new(nib).args(["wifi", way]));
             // Status bars show it now, not at their next read.
             crate::net::refresh();
         });
+    }
+}
+
+/// Brings nibOS's network up (both radios' daemons, iwd and BlueZ: `nib net up`), where its
+/// mode left it down, and returns when it has. Wi-Fi stays as its switch has it.
+pub fn network_up() {
+    if let Some(nib) = platform::NETWORK {
+        run(Command::new(nib).args(["net", "up"]));
+        crate::net::refresh();
     }
 }
 

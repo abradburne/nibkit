@@ -134,7 +134,11 @@ pub fn wifi() -> Option<bool> {
 pub fn set_wifi(on: bool) {
     if let Some(nib) = platform::NETWORK {
         let way = if on { "up" } else { "down" };
-        std::thread::spawn(move || run(Command::new(nib).args(["net", way])));
+        std::thread::spawn(move || {
+            run(Command::new(nib).args(["net", way]));
+            // Status bars show it now, not at their next read.
+            crate::net::refresh();
+        });
     }
 }
 

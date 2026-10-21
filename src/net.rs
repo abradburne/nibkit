@@ -59,7 +59,7 @@ impl From<zbus::fdo::Error> for Error {
     }
 }
 use std::process::Command;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
 /// The Wi-Fi radio.
@@ -121,7 +121,18 @@ pub fn radios() -> Radios {
     })
 }
 
-/// The radios, read on a thread of its own every so often.
+/// Asks every [`Monitor`] to read the radios again now rather than at its next turn: after
+/// anything that changes them (a switch, joining, connecting), so a status bar shows it at once.
+pub fn refresh() {
+    let (asked, wake) = &WAKE;
+    *asked.lock().unwrap_or_else(|e| e.into_inner()) = true;
+    wake.notify_all();
+}
+
+/// What [`refresh`] sets and the monitors wait on.
+static WAKE: (Mutex<bool>, Condvar) = (Mutex::new(false), Condvar::new());
+
+/// The radios, read on a thread of its own every so often, and at once after [`refresh`].
 pub struct Monitor {
     now: Arc<Mutex<Radios>>,
 }
@@ -138,7 +149,14 @@ impl Monitor {
                 .spawn(move || loop {
                     let found = radios();
                     *shared.lock().unwrap_or_else(|e| e.into_inner()) = found;
-                    std::thread::sleep(every);
+                    let (asked, wake) = &WAKE;
+                    let mut now = asked.lock().unwrap_or_else(|e| e.into_inner());
+                    if !*now {
+                        now = wake
+                            .wait_timeout(now, every)
+                            .map_or_else(|e| e.into_inner().0, |r| r.0);
+                    }
+                    *now = false;
                 });
         }
         Monitor { now }

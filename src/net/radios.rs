@@ -253,6 +253,8 @@ mod real {
                     }
                 };
                 set(&|s| (s.busy, s.said) = (None, Some(said.clone())));
+                // A status bar's icons show it now, not at their next read.
+                crate::net::refresh();
             }
             let wifi = Wifi::open().ok().and_then(|w| read_wifi(&w));
             let bluetooth = bt.as_ref().and_then(|b| read_bt(b, looking));

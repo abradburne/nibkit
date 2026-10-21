@@ -20,6 +20,7 @@
 //! }
 //! ```
 
+use super::glyphs::Glyph;
 use super::model::{Row, Value};
 use crate::net::radios::{Do, Gadget, Radios, Snapshot};
 use std::time::{Duration, Instant};
@@ -48,18 +49,35 @@ pub struct Connections {
     wifi: (Option<bool>, Instant),
 }
 
-/// A device's value on a row, as DSlot's Bluetooth page shows it: "headphones · Connected · 80%".
-pub fn device_value(g: &Gadget) -> String {
+/// A device's value on a row, as DSlot's Bluetooth page shows it: "headphones · Connected",
+/// and its battery as the battery icon where it says.
+pub fn device_value(g: &Gadget) -> Value {
     let state = match (g.paired, g.connected) {
         (false, _) => "Press A to pair",
         (true, true) => "Connected",
         (true, false) => "Not connected",
     };
-    let battery = g
-        .battery
-        .map(|b| format!("  \u{b7}  {b}%"))
-        .unwrap_or_default();
-    format!("{}  \u{b7}  {state}{battery}", g.kind)
+    Value::Status {
+        text: format!("{}  \u{b7}  {state}", g.kind),
+        glyphs: g.battery.map(Glyph::Battery).into_iter().collect(),
+    }
+}
+
+/// A network's signal, with a lock where it needs a passphrase and a check where it is the
+/// one joined, as DSlot's Wi-Fi page shows them: `text` before them.
+pub fn network_value(text: impl Into<String>, bars: u8, locked: bool, joined: bool) -> Value {
+    let mut glyphs = Vec::new();
+    if joined {
+        glyphs.push(Glyph::Check);
+    }
+    if locked {
+        glyphs.push(Glyph::Lock);
+    }
+    glyphs.push(Glyph::Signal(bars));
+    Value::Status {
+        text: text.into(),
+        glyphs,
+    }
 }
 
 impl Connections {
@@ -113,10 +131,13 @@ impl Connections {
             .map(|line| match line {
                 Line::Wifi => {
                     let joined = self.now.wifi.as_ref().and_then(|w| w.joined.clone());
-                    let row = Row::new("Wi-Fi", on_off(self.wifi.0 == Some(true)));
                     match joined {
-                        Some((name, _)) if self.wifi.0 == Some(true) => row.with_note(name),
-                        _ => row,
+                        // On and joined: the network, with its signal.
+                        Some((name, bars)) if self.wifi.0 == Some(true) => {
+                            Row::new("Wi-Fi", network_value("On", bars, false, true))
+                                .with_note(name)
+                        }
+                        _ => Row::new("Wi-Fi", on_off(self.wifi.0 == Some(true))),
                     }
                 }
                 Line::Bluetooth => Row::new(
@@ -135,7 +156,7 @@ impl Connections {
                         .flat_map(|b| &b.devices)
                         .find(|g| g.address == address);
                     match g {
-                        Some(g) => Row::new(g.name.clone(), Value::Text(device_value(g))),
+                        Some(g) => Row::new(g.name.clone(), device_value(g)),
                         None => Row::new(address, Value::Text("\u{2013}".into())),
                     }
                 }
@@ -194,14 +215,24 @@ mod tests {
         };
         assert_eq!(
             device_value(&g),
-            "headphones  \u{b7}  Connected  \u{b7}  80%"
+            Value::Status {
+                text: "headphones  \u{b7}  Connected".into(),
+                glyphs: vec![Glyph::Battery(80)]
+            }
         );
         let g = Gadget {
             connected: false,
             battery: None,
             ..g
         };
-        assert_eq!(device_value(&g), "headphones  \u{b7}  Not connected");
+        assert!(matches!(device_value(&g), Value::Status { glyphs, .. } if glyphs.is_empty()));
+        assert_eq!(
+            network_value("", 3, true, true),
+            Value::Status {
+                text: String::new(),
+                glyphs: vec![Glyph::Check, Glyph::Lock, Glyph::Signal(3)]
+            }
+        );
     }
 
     #[test]

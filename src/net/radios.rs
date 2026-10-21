@@ -50,6 +50,8 @@ pub struct Net {
     pub connected: bool,
     /// Joining asks for a passphrase (and it isn't known).
     pub locked: bool,
+    /// It is secured (a passphrase, or more): known or not.
+    pub secured: bool,
     /// iwd can't join it here (WEP, Enterprise).
     pub unsupported: bool,
 }
@@ -387,6 +389,7 @@ mod real {
             .into_iter()
             .map(|n| Net {
                 locked: n.security.needs_passphrase() && !n.known,
+                secured: n.security != Security::Open,
                 unsupported: matches!(n.security, Security::Wep | Security::Enterprise) && !n.known,
                 name: n.name,
                 bars: n.bars,

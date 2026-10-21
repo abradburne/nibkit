@@ -24,6 +24,8 @@ pub const BAR_H: f32 = 96.0;
 pub const HINT_Y: f32 = 636.0;
 /// A star's size, in screen units.
 pub const ICON: f32 = 26.0;
+/// A row's pictures' height (`Value::Status`), in screen units: the text's capitals.
+pub const GLYPH: f32 = 26.0;
 /// The battery icon's height, in screen units.
 pub const BATTERY: f32 = 22.0;
 
@@ -121,6 +123,18 @@ pub enum Draw {
         y: f32,
         /// The slot cut into it.
         slot: Slot,
+    },
+    /// A small picture on a row (a signal, a lock, a check), `h` high, its left edge at `x`:
+    /// [`super::glyphs::render`] draws it.
+    Glyph {
+        /// Which.
+        glyph: super::glyphs::Glyph,
+        /// Its left edge.
+        x: f32,
+        /// Its top edge.
+        y: f32,
+        /// Its height.
+        h: f32,
     },
     /// One of the app's own pictures (a save state's), fitted into the box: as large as it goes
     /// with its own proportions kept, centred, the box's background showing round it. A
@@ -310,6 +324,37 @@ pub fn menu_measured(
                 let ink = if *warning { colour::RED } else { colour::WHITE };
                 out.push(text(t, value, (RIGHT, y - 16.0), 1.0, ink));
                 width(t, 26.0, true)
+            }
+            Value::Status { text: t, glyphs } => {
+                // The pictures at the right edge, right to left, the words left of them.
+                let (h, gap) = (GLYPH, 12.0);
+                let mut x = RIGHT;
+                for &g in glyphs.iter().rev() {
+                    let w = g.width(h);
+                    x -= w;
+                    out.push(match g {
+                        super::glyphs::Glyph::Battery(percent) => Draw::Battery {
+                            x,
+                            y: y - h * 0.42,
+                            h: h * 0.84,
+                            percent,
+                            charging: false,
+                        },
+                        _ => Draw::Glyph {
+                            glyph: g,
+                            x,
+                            y: y - h / 2.0,
+                            h,
+                        },
+                    });
+                    x -= gap;
+                }
+                if !t.is_empty() {
+                    let ink = if lit { colour::WHITE } else { colour::DIM };
+                    out.push(text(t, value, (x, y - 16.0), 1.0, ink));
+                    x -= width(t, 26.0, true);
+                }
+                RIGHT - x
             }
             Value::Stars(rating) => {
                 let w = 5.0 * (ICON + 4.0) - 4.0;

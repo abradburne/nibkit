@@ -2,6 +2,11 @@
 
 ## 0.1.0 (unreleased)
 
+- `menu::glyphs` and `Value::Status`: a row's state in words and then small pictures (a
+  network's signal as the status bar's fan of arcs, bright and dim, a lock, a check; a
+  device's battery as the battery icon), drawn by `glyphs::render` at the text's height, so
+  every app's (and `menu-raster`'s) are the same shapes. The Connections page shows them:
+  `device_value` is a `Value` now, `network_value` new. `net::radios::Net::secured`.
 - `net::radios` (feature `net-control`): a worker thread for a menu's Wi-Fi and Bluetooth pages:
   a snapshot of both read every couple of seconds, one thing done at a time (scan, join,
   leave, forget, power, look, pair, connect, disconnect, remove), pairing's questions answered

@@ -34,6 +34,7 @@
 
 #[cfg(feature = "net-control")]
 pub mod connections;
+pub mod glyphs;
 mod input;
 pub mod keyboard;
 pub mod layout;
@@ -42,6 +43,7 @@ mod model;
 pub mod raster;
 pub mod top;
 
+pub use glyphs::Glyph;
 pub use input::{Effect, Key};
 pub use layout::Draw;
 pub use model::{Card, Menu, Row, Shelf, Slot, Status, Value};

@@ -75,6 +75,14 @@ pub enum Value {
     Stars(u8),
     /// A level, 0-100, with its bar.
     Slider(u8),
+    /// A state in words, then small pictures after it: a network's signal, lock and check, a
+    /// device's battery ("headphones · Connected" and its battery). Either may be empty.
+    Status {
+        /// What it says, left of the pictures.
+        text: String,
+        /// The pictures, left to right.
+        glyphs: Vec<super::glyphs::Glyph>,
+    },
     /// An action waiting for its second press ("A again to delete"): white, or red when it
     /// deletes something.
     Prompt {

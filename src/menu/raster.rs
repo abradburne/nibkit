@@ -237,6 +237,23 @@ impl Canvas {
                     charging,
                 } => self.battery(*x, *y, *h, *percent, *charging),
                 Draw::Bar { y, slot } => self.bar(*y, *slot),
+                Draw::Glyph { glyph, x, y, h } => {
+                    let s = self.scale;
+                    let px_h = (h * s).round().max(1.0) as usize;
+                    let (on, off) = (colour::WHITE, [70, 76, 92]);
+                    let (gw, rgba) = super::glyphs::render(*glyph, px_h, on, off);
+                    let (x0, y0) = ((x * s).round() as i32, (y * s).round() as i32);
+                    for py in 0..px_h {
+                        for px in 0..gw {
+                            let i = (py * gw + px) * 4;
+                            let a = rgba[i + 3];
+                            if a > 0 {
+                                let c = [rgba[i], rgba[i + 1], rgba[i + 2]];
+                                self.blend(x0 + px as i32, y0 + py as i32, c, a as f32 / 255.0);
+                            }
+                        }
+                    }
+                }
                 Draw::Picture {
                     index,
                     x,

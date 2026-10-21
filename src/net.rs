@@ -14,6 +14,48 @@
 
 use crate::platform;
 use std::path::Path;
+
+#[cfg(feature = "net-control")]
+pub mod bluetooth;
+#[cfg(feature = "net-control")]
+pub mod wifi;
+
+/// Why joining, pairing or another change to a radio didn't happen (feature `net-control`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Error {
+    /// The system has no way to: the stock OS, a desktop.
+    Unsupported,
+    /// The radio is off (its daemon not running).
+    Off,
+    /// It was tried and failed, and why.
+    Failed(String),
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::Unsupported => f.write_str("not on this system"),
+            Error::Off => f.write_str("it is off"),
+            Error::Failed(why) => f.write_str(why),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+#[cfg(feature = "net-control")]
+impl From<zbus::Error> for Error {
+    fn from(e: zbus::Error) -> Error {
+        Error::Failed(e.to_string())
+    }
+}
+
+#[cfg(feature = "net-control")]
+impl From<zbus::fdo::Error> for Error {
+    fn from(e: zbus::fdo::Error) -> Error {
+        Error::Failed(e.to_string())
+    }
+}
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -154,7 +196,7 @@ fn running(root: &Path, name: &str) -> bool {
 }
 
 /// Signal bars, of 4, for a signal of `dbm`.
-fn bars(dbm: i32) -> u8 {
+pub(crate) fn bars(dbm: i32) -> u8 {
     match dbm {
         d if d >= -55 => 4,
         d if d >= -65 => 3,

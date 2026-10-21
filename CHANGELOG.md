@@ -2,6 +2,13 @@
 
 ## 0.1.0 (unreleased)
 
+- `net::wifi` and `net::bluetooth` (feature `net-control`, zbus): Wi-Fi through iwd's D-Bus API
+  (status, scan, the networks in range with security and signal, joining with a passphrase
+  through an agent, disconnecting, known networks, forgetting) and Bluetooth through BlueZ's
+  (power, the devices with their kind, battery and signal, discovery, pairing with an agent
+  that asks the app (PIN, passkey, confirmation), trust, connect, disconnect, remove).
+  `net::Error`: unsupported (the stock OS, a desktop), off, or failed and why in a person's
+  words. Example: `radios`.
 - `dslot::apps` also lists the apps installed with the system (`platform::SYSTEM_APPS`:
   `/usr/share/dslot/apps` on nibOS), for a package's app, which can't write to the cards.
 - `net`: the radios for a status bar: Wi-Fi off, connecting or connected (with signal bars),

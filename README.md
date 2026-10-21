@@ -28,6 +28,7 @@ nibkit = "0.1"                                                         # nibOS; 
 | `desktop` | Built for a computer: no panels (an app opens windows: `screens::desktop_windows`, the mouse on the bottom one as touch: `Rect::panel_point`), a keyboard map (`input::keyboard`), the platform's own app folders, the handheld's controls `None`. Chosen anyway on any target but Linux. |
 | `dslot` | For an emulator or app DSlot starts: description files, the apps folder, the saves convention, DSlot's settings file. |
 | `menu` | DSlot's menu for any app's touch screen: what goes where, and the buttons and touches. No dependencies. |
+| `net-control` | Joining Wi-Fi and pairing Bluetooth: `net::wifi`, `net::bluetooth` (zbus). |
 | `menu-raster` | `menu`, drawn into an RGBA picture in Roboto Condensed (embedded, SIL OFL 1.1: `assets/OFL.txt`). |
 
 Rust 1.87 or later.
@@ -56,6 +57,7 @@ the speakers' tuning, the network and powering off are the handheld's: `None`, o
 | `battery` | `read()` (charge, state, plugged in, `time_to_full()`), `protect()`, `set_protect(bool)`, `watch()`: the battery by the RK817's count, and battery protect (stop charging at about 80%, by a lower charge voltage). `None` on the stock OS. |
 | `device` | `volume()`, `set_volume()` (PipeWire, through `pactl`), `wifi()`, `set_wifi()` (`nib net`), `sleep()`, `restart()`, `power_off()`. |
 | `net` | The radios for a status bar: `radios()` reads Wi-Fi (off, connecting, connected with signal bars: sysfs, `iw`) and Bluetooth (off, on, connected: how many devices, whether one is a gamepad: sysfs, BlueZ's `Powered`); `Monitor::start(every)` reads them on a thread of its own, `now()` gives the last. `Unknown` on the stock OS and a desktop. |
+| `net::wifi`, `net::bluetooth` (feature `net-control`) | Wi-Fi through iwd (`Wifi::open()`, `status()`, `scan()`, `networks()`, `connect(network, passphrase)`, `known()`, `forget()`) and Bluetooth through BlueZ (`Bluetooth::open()`, `set_powered()`, `devices()`, `discover()`, `pair(device, answer)`, `connect()`, `disconnect()`, `remove()`), over D-Bus. Calls block: use a thread. |
 | `clock` | `hour12()`: nibOS's 12- or 24-hour preference (`~/.config/nibos/prefs.toml`, else the locale's habit); `format(h, m, hour12)`. |
 | `power` | The power menu's request (SIGUSR1 on a long press of power, nibOS): `watch()`, then `take()` once a frame. **A program DSlot starts saves its auto-resume state and exits on SIGTERM**: that is how a game is put away for the menu. |
 | `audio` | `ADVICE`: the sample rate and buffer size that suit the sound server: PipeWire at 48 kHz on nibOS; on the stock OS PulseAudio behind an ALSA shim that wants big buffers. |

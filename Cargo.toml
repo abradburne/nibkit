@@ -40,12 +40,16 @@ dslot = []
 # `menu-raster`, drawing it into a picture in Roboto Condensed (fontdue).
 menu = []
 menu-raster = ["menu", "dep:fontdue"]
+# Joining Wi-Fi networks (iwd) and pairing Bluetooth devices (BlueZ) over D-Bus: `net::wifi`,
+# `net::bluetooth`.
+net-control = ["dep:zbus"]
 
 [dependencies]
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 toml = { version = "0.8", default-features = false, features = ["parse", "display"] }
 fontdue = { version = "0.9", optional = true }
+zbus = { version = "5", optional = true, default-features = false, features = ["blocking-api", "async-io"] }
 
 [dev-dependencies]
 # For the example only: nibkit itself uses no graphics library.
@@ -53,4 +57,4 @@ sdl2 = "0.38"
 
 # docs.rs: everything there is, as it builds on Linux (nibOS).
 [package.metadata.docs.rs]
-features = ["dslot", "menu-raster"]
+features = ["dslot", "menu-raster", "net-control"]

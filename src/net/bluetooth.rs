@@ -26,11 +26,11 @@
 
 use super::Error;
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 use zbus::blocking::{Connection, Proxy};
 use zbus::zvariant::{OwnedObjectPath, OwnedValue};
 
 const BLUEZ: &str = "org.bluez";
-const ADAPTER: &str = "/org/bluez/hci0";
 const AGENT_PATH: &str = "/nibkit/bluetooth/agent";
 
 /// What kind of device it is, by what it says it is.
@@ -150,11 +150,34 @@ impl Bluetooth {
         let bt = Bluetooth {
             bus: Connection::system()?,
         };
-        let found = bt.objects().map_err(|_| Error::Off)?;
-        if !found.contains_key(&adapter()) {
-            return Err(Error::Off);
-        }
+        bt.adapter()?;
         Ok(bt)
+    }
+
+    /// The adapter, as BlueZ lists it now: [`Error::Off`] while there is none (BlueZ stopped,
+    /// or just started and not yet found it). Looked up every time, never kept: BlueZ is
+    /// stopped and started with nibOS's other radio (`nib net`).
+    fn adapter(&self) -> Result<OwnedObjectPath, Error> {
+        let found = self.objects().map_err(|_| Error::Off)?;
+        let mut adapters: Vec<OwnedObjectPath> = found
+            .into_iter()
+            .filter(|(_, i)| i.contains_key("org.bluez.Adapter1"))
+            .map(|(p, _)| p)
+            .collect();
+        adapters.sort_by(|a, b| a.as_str().cmp(b.as_str()));
+        adapters.into_iter().next().ok_or(Error::Off)
+    }
+
+    /// The adapter, waiting up to `wait` for BlueZ to find it.
+    fn adapter_within(&self, wait: Duration) -> Result<OwnedObjectPath, Error> {
+        let start = Instant::now();
+        loop {
+            match self.adapter() {
+                Ok(a) => return Ok(a),
+                Err(e) if start.elapsed() >= wait => return Err(e),
+                Err(_) => std::thread::sleep(Duration::from_millis(250)),
+            }
+        }
     }
 
     fn objects(&self) -> Result<Objects, Error> {
@@ -186,18 +209,46 @@ impl Bluetooth {
         )?)
     }
 
-    /// Whether the radio is on.
+    /// Whether BlueZ has an adapter now (none while nibOS's radios are off).
+    pub fn present(&self) -> bool {
+        self.adapter().is_ok()
+    }
+
+    /// Whether the radio is on: off while there is no adapter.
     pub fn powered(&self) -> Result<bool, Error> {
+        let Ok(adapter) = self.adapter() else {
+            return Ok(false);
+        };
         Ok(self
-            .proxy(&adapter(), "org.bluez.Adapter1")?
+            .proxy(&adapter, "org.bluez.Adapter1")?
             .get_property("Powered")?)
     }
 
-    /// Turns the radio on or off (off disconnects everything).
+    /// Turns the radio on or off (off disconnects everything). Off with no adapter (BlueZ
+    /// stopped, or gone while it was asked) is off already; on waits a few seconds for an
+    /// adapter BlueZ is still finding.
     pub fn set_powered(&self, on: bool) -> Result<(), Error> {
-        self.proxy(&adapter(), "org.bluez.Adapter1")?
-            .set_property("Powered", on)?;
-        Ok(())
+        let adapter = match self.adapter_within(Duration::from_secs(if on { 5 } else { 0 })) {
+            Ok(a) => a,
+            Err(Error::Off) if !on => return Ok(()),
+            Err(e) => return Err(e),
+        };
+        // BlueZ just started may refuse it while it brings the adapter up: tried again for a
+        // few seconds, done once the adapter says so.
+        let start = Instant::now();
+        loop {
+            let tried = self
+                .proxy(&adapter, "org.bluez.Adapter1")?
+                .set_property("Powered", on);
+            match tried {
+                Ok(()) => return Ok(()),
+                // Gone as it was turned off: off.
+                Err(e) if !on && gone(&e.to_string()) => return Ok(()),
+                Err(_) if self.powered().ok() == Some(on) => return Ok(()),
+                Err(e) if start.elapsed() >= Duration::from_secs(3) => return Err(e.into()),
+                Err(_) => std::thread::sleep(Duration::from_millis(300)),
+            }
+        }
     }
 
     /// The devices BlueZ knows: the paired ones first (connected first among them), then any
@@ -248,7 +299,7 @@ impl Bluetooth {
     /// Starts or stops looking for devices to pair. Found ones join [`Bluetooth::devices`];
     /// looking stops by itself when this [`Bluetooth`] is dropped.
     pub fn discover(&self, on: bool) -> Result<(), Error> {
-        let adapter = self.proxy(&adapter(), "org.bluez.Adapter1")?;
+        let adapter = self.proxy(&self.adapter()?, "org.bluez.Adapter1")?;
         let result = adapter.call_method(
             if on {
                 "StartDiscovery"
@@ -323,14 +374,40 @@ impl Bluetooth {
 
     /// Forgets a device: unpaired, and gone from the list.
     pub fn remove(&self, device: &Device) -> Result<(), Error> {
-        self.proxy(&adapter(), "org.bluez.Adapter1")?
+        self.proxy(&self.adapter()?, "org.bluez.Adapter1")?
             .call_method("RemoveDevice", &(&device.path,))?;
         Ok(())
     }
 }
 
-fn adapter() -> OwnedObjectPath {
-    OwnedObjectPath::try_from(ADAPTER).expect("a valid path")
+/// Whether a D-Bus error says the object or BlueZ itself isn't there (any more).
+fn gone(error: &str) -> bool {
+    [
+        "UnknownObject",
+        "ServiceUnknown",
+        "NameHasNoOwner",
+        "UnknownMethod",
+    ]
+    .iter()
+    .any(|k| error.contains(k))
+}
+
+/// A BlueZ or D-Bus error as a person would want it said: short, no D-Bus names. The raw one
+/// is for the log.
+pub fn friendly(error: &str) -> String {
+    if gone(error) {
+        "Bluetooth isn't ready yet: try again in a moment".into()
+    } else if error.contains("NotReady") {
+        "Bluetooth is still starting".into()
+    } else if error.contains("Blocked") || error.contains("rfkill") {
+        "Bluetooth is blocked".into()
+    } else if error.contains("InProgress") || error.contains("Busy") {
+        "Bluetooth is busy: try again".into()
+    } else if error.contains("org.freedesktop.DBus") || error.contains("org.bluez") {
+        "That didn't work: try again".into()
+    } else {
+        error.to_owned()
+    }
 }
 
 /// Why pairing failed, in a person's words, from BlueZ's error.
@@ -346,7 +423,8 @@ fn pairing(error: &str) -> String {
     } else if error.contains("ConnectionAttemptFailed") || error.contains("Page Timeout") {
         "Couldn't reach it: is it in pairing mode, and near?".into()
     } else {
-        format!("Couldn't pair ({error})")
+        eprintln!("nibkit: pairing: {error}");
+        "Couldn't pair: try again with the device in pairing mode".into()
     }
 }
 
@@ -357,7 +435,8 @@ fn connecting(error: &str) -> String {
     } else if error.contains("InProgress") {
         "It is already connecting".into()
     } else {
-        format!("Couldn't connect ({error})")
+        eprintln!("nibkit: connecting: {error}");
+        "Couldn't connect: is it on, and near?".into()
     }
 }
 
@@ -442,6 +521,13 @@ mod tests {
         assert_eq!(Kind::from_icon(""), Kind::Other);
         assert!(pairing("org.bluez.Error.AuthenticationFailed").contains("codes"));
         assert!(connecting("br-connection-page-timeout Page Timeout").contains("reach"));
+        // The user's report: a raw D-Bus error, never shown as it is.
+        let raw = "org.freedesktop.DBus.Error.UnknownObject: Method \"Set\" with signature \"ssv\" on interface \"org.freedesktop.DBus.Properties\" doesn't exist";
+        assert!(gone(raw));
+        let shown = friendly(raw);
+        assert!(!shown.contains("org.") && !shown.contains("ssv"), "{shown}");
+        assert!(!friendly("org.bluez.Error.Failed: whatever").contains("org."));
+        assert_eq!(friendly("Joined Home"), "Joined Home");
     }
 
     #[test]

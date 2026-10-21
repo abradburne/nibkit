@@ -312,7 +312,8 @@ fn joining(error: &str) -> String {
     } else if error.contains("Timeout") || error.contains("NoReply") {
         "The network didn't answer".into()
     } else {
-        format!("Couldn't join ({error})")
+        eprintln!("nibkit: joining: {error}");
+        "Couldn't join it: try again".into()
     }
 }
 

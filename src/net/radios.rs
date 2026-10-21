@@ -219,7 +219,7 @@ mod real {
             };
             // nibOS turns its radios on and off together (`nib net`, the Wi-Fi switch): Bluetooth
             // on while they are off brings them up first, and waits for the adapter.
-            if what == Some(Do::Power(true)) && bt.as_ref().is_none_or(|b| b.powered().is_err()) {
+            if what == Some(Do::Power(true)) && bt.as_ref().is_none_or(|b| !b.present()) {
                 crate::device::set_wifi(true);
                 bt = None;
                 for _ in 0..20 {
@@ -241,8 +241,17 @@ mod real {
                     // Maybe it went away (iwd stopped, BlueZ restarted): open it again next time.
                     bt = None;
                 }
-                let said = said.unwrap_or_else(|e| e);
-                eprintln!("dslot: {doing} {said}");
+                // The raw error for the log; a short line for the person.
+                let said = match said {
+                    Ok(said) => {
+                        eprintln!("nibkit: {doing} {said}");
+                        said
+                    }
+                    Err(raw) => {
+                        eprintln!("nibkit: {doing} failed: {raw}");
+                        crate::net::bluetooth::friendly(&raw)
+                    }
+                };
                 set(&|s| (s.busy, s.said) = (None, Some(said.clone())));
             }
             let wifi = Wifi::open().ok().and_then(|w| read_wifi(&w));

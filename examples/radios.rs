@@ -1,6 +1,8 @@
 //! The radios as nibkit's `net` sees them (feature `net-control`), without changing anything:
 //! the Wi-Fi network joined and the ones in range, the known ones, and the Bluetooth devices.
-//! `radios scan` asks for a Wi-Fi scan first.
+//! `radios scan` asks for a Wi-Fi scan first. `radios bt-cycle` turns Bluetooth off and on four
+//! times, then off straight after BlueZ restarts (needs sudo for the restart), and on again:
+//! each step says whether it worked.
 //!
 //! ```sh
 //! cargo run --example radios --features net-control -- scan
@@ -8,7 +10,29 @@
 
 use nibkit::net::{bluetooth::Bluetooth, wifi::Wifi};
 
+fn bt_cycle() {
+    let bt = match Bluetooth::open() {
+        Ok(bt) => bt,
+        Err(e) => return println!("bluetooth: {e}"),
+    };
+    for on in [false, true, false, true, false, true, false, true] {
+        let r = bt.set_powered(on);
+        println!("powered {on}: {r:?} -> now {:?}", bt.powered());
+    }
+    let _ = std::process::Command::new("sudo")
+        .args(["systemctl", "restart", "bluetooth"])
+        .status();
+    let r = bt.set_powered(false);
+    println!("off right after BlueZ restarted: {r:?}");
+    std::thread::sleep(std::time::Duration::from_secs(2));
+    let r = bt.set_powered(true);
+    println!("on again: {r:?} -> now {:?}", bt.powered());
+}
+
 fn main() {
+    if std::env::args().any(|a| a == "bt-cycle") {
+        return bt_cycle();
+    }
     match Wifi::open() {
         Ok(wifi) => {
             if std::env::args().any(|a| a == "scan") {

@@ -11,6 +11,8 @@
 //! - [`Menu::key`], [`Menu::touch`] (and the same on [`Shelf`]) move the highlight with the
 //!   buttons and find what a finger touched, saying what to do as an [`Effect`].
 //! - [`keyboard`] is the on-screen keyboard, for a passphrase, a PIN or a search.
+//! - `connections` (with feature `net-control`) is a ready-made page of Wi-Fi and Bluetooth
+//!   on or off and the paired devices to connect, for a game's pause menu.
 //! - [`top`] lays out the top screen while the menu is open: the game paused, or a save
 //!   state's picture and details.
 //! - [`raster`] (feature `menu-raster`) draws the [`Draw`]s into an RGBA picture in Roboto
@@ -30,6 +32,8 @@
 //! assert!(!draws.is_empty());
 //! ```
 
+#[cfg(feature = "net-control")]
+pub mod connections;
 mod input;
 pub mod keyboard;
 pub mod layout;

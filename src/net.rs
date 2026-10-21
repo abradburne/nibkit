@@ -18,6 +18,8 @@ use std::path::Path;
 #[cfg(feature = "net-control")]
 pub mod bluetooth;
 #[cfg(feature = "net-control")]
+pub mod radios;
+#[cfg(feature = "net-control")]
 pub mod wifi;
 
 /// Why joining, pairing or another change to a radio didn't happen (feature `net-control`).

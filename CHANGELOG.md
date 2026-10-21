@@ -2,6 +2,14 @@
 
 ## 0.1.0 (unreleased)
 
+- `net::radios` (feature `net-control`): a worker thread for a menu's Wi-Fi and Bluetooth pages:
+  a snapshot of both read every couple of seconds, one thing done at a time (scan, join,
+  leave, forget, power, look, pair, connect, disconnect, remove), pairing's questions answered
+  through `Radios::reply`. From DSlot, which now uses it.
+- `menu::connections` (features `menu`, `net-control`): the Connections page any app's pause
+  menu can include: Wi-Fi and Bluetooth on or off, and the paired devices connected or
+  disconnected with one press, with their battery, as DSlot's pages show them.
+  `Connections::start`, `refresh`, `title`, `rows`, `act`; `HINT`; `device_value`.
 - `menu::keyboard`: the on-screen keyboard, for a passphrase, a PIN or a search: letters,
   symbols, or a number pad for digits; laid out as `Draw`s like the menu; the D-pad and A to
   type, B to delete, Y to show a secret, L shift, R symbols, Start done, Select cancel, or a tap

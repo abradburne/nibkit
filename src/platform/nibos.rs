@@ -64,6 +64,8 @@ pub const AMP_TUNING: Option<&str> = Some("/usr/lib/nibos/nib-audio");
 pub const VOLUME: bool = true;
 /// `nib net up|down|status`.
 pub const NETWORK: Option<&str> = Some("nib");
+/// Wi-Fi (iwd) and Bluetooth (BlueZ), whose state `net` reads.
+pub const RADIOS: bool = true;
 pub const POWER_OFF: &[&str] = &["systemctl", "poweroff"];
 pub const RESTART: &[&str] = &["systemctl", "reboot"];
 /// logind's suspend: returns once the device is awake again.

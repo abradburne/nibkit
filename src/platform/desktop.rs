@@ -68,6 +68,8 @@ pub const BATTERY_PROTECT: Option<&[&str]> = None;
 pub const AMP_TUNING: Option<&str> = None;
 pub const VOLUME: bool = false;
 pub const NETWORK: Option<&str> = None;
+/// A computer's radios are its own business: `net` leaves them unknown.
+pub const RADIOS: bool = false;
 /// Never run: powering off and restarting are only done on the device itself.
 pub const POWER_OFF: &[&str] = &["true"];
 pub const RESTART: &[&str] = &["true"];

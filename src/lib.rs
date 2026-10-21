@@ -12,6 +12,7 @@
 //! | [`backlight`] | Each screen's brightness, in percent. |
 //! | [`battery`] | The battery's charge, time to full, and battery protect (stop at about 80%). |
 //! | [`device`] | Volume, Wi-Fi, sleeping, restarting, powering off. |
+//! | [`net`] | The radios for a status bar: Wi-Fi off, connecting or connected (and its signal), Bluetooth off, on or connected. |
 //! | [`power`] | The power menu's request (a long press of power on nibOS), and what a game does when it is put away for it. |
 //! | [`audio`] | The sample rate and buffer size that suit the system's sound server. |
 //! | [`paths`] | Where an app keeps its settings, data and cache; where games and saves are. |
@@ -35,6 +36,7 @@ pub mod dslot;
 pub mod input;
 #[cfg(feature = "menu")]
 pub mod menu;
+pub mod net;
 pub mod paths;
 mod platform;
 pub mod power;

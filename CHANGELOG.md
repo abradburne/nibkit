@@ -2,6 +2,10 @@
 
 ## 0.1.0 (unreleased)
 
+- `net`: the radios for a status bar: Wi-Fi off, connecting or connected (with signal bars),
+  Bluetooth off, on or connected (how many, and whether one is a gamepad). Read from sysfs,
+  `iw` and BlueZ's `Powered`, never hard: `net::Monitor` reads them on a thread every few
+  seconds. Unknown on the stock OS and a desktop.
 - `desktop` (feature, and the choice on any target but Linux): an app made for the handheld
   builds and runs on a computer: windows for the screens (`screens::desktop_windows`, the mouse
   on the bottom one as touch with `Rect::panel_point`), a keyboard map (`input::keyboard`,

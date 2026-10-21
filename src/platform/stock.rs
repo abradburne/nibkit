@@ -60,6 +60,8 @@ pub const BATTERY_PROTECT: Option<&[&str]> = None;
 pub const AMP_TUNING: Option<&str> = None;
 pub const VOLUME: bool = false;
 pub const NETWORK: Option<&str> = None;
+/// The stock OS says nothing `net` can read about its radios.
+pub const RADIOS: bool = false;
 /// As the stock menu does it.
 pub const POWER_OFF: &[&str] = &["poweroff"];
 pub const RESTART: &[&str] = &["reboot"];

@@ -18,6 +18,20 @@
 //!
 //! Systems are named as the `Roms/` folders are: `NDS`, `GBA`, `GB`, `GBC`.
 //!
+//! An emulator that plays only some of a system's games lists them, by file name, in a file of
+//! its own, named under `[games]`:
+//!
+//! ```toml
+//! [games]
+//! GW = "/usr/share/inktick/units.tsv"
+//! ```
+//!
+//! One line a game, tab-separated: its ROM's name without the extension (a MAME set's name,
+//! `gnw_dkjr`), then its title, model, year and series (`Donkey Kong Jr.`, `DJ-101`, `1982`,
+//! `New Wide Screen`); the last three may be empty, and `#` lines are comments. It is then the
+//! default only for the games listed ([`Emulators::choose_for`]), the others going to the next
+//! that takes them, and the titles name the games on the shelf ([`Emulators::unit`]).
+//!
 //! An emulator with a menu of its own can keep the options it declares in DSlot's settings
 //! ([`settings_file`]), so the two menus show the same values: under its id, at the console's
 //! or the game's level (`[console.GB.inkdot]`, `[game."GB/Tetris (World)".inkdot]`), with
@@ -75,6 +89,45 @@ struct Description {
     options: Vec<OptionDecl>,
     #[serde(default)]
     actions: Vec<ActionDecl>,
+    /// The only games it plays of a system, by the system: a file listing them.
+    #[serde(default)]
+    games: BTreeMap<String, PathBuf>,
+}
+
+/// A game an emulator lists (`[games]`): what it is called and what it was.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Unit {
+    /// Its title: "Donkey Kong Jr.".
+    pub title: String,
+    /// Its model number: "DJ-101".
+    pub model: String,
+    /// The year it came out.
+    pub year: String,
+    /// The series it was one of: "New Wide Screen".
+    pub series: String,
+}
+
+/// A `[games]` list's lines, by the game's name. Comments, blank lines and lines without a
+/// title are passed over.
+fn units(text: &str) -> BTreeMap<String, Unit> {
+    text.lines()
+        .filter(|l| !l.trim_start().starts_with('#'))
+        .filter_map(|l| {
+            let mut f = l.split('\t').map(str::trim);
+            let name = f.next().filter(|n| !n.is_empty())?;
+            let title = f.next().filter(|t| !t.is_empty())?;
+            let mut next = || f.next().unwrap_or("").to_owned();
+            Some((
+                name.to_owned(),
+                Unit {
+                    title: title.to_owned(),
+                    model: next(),
+                    year: next(),
+                    series: next(),
+                },
+            ))
+        })
+        .collect()
 }
 
 /// An option as declared:
@@ -310,9 +363,30 @@ pub struct Emulator {
     pub options: Vec<EmuOption>,
     /// Its actions on a game's files.
     pub actions: Vec<Action>,
+    /// The only games it plays of a system, where it lists them (`[games]`).
+    games: Vec<(String, BTreeMap<String, Unit>)>,
 }
 
 impl Emulator {
+    /// Whether it plays `game` (a ROM's name without its extension) of `system`: it plays the
+    /// system, and lists the game there or lists none.
+    pub fn takes(&self, system: &str, game: &str) -> bool {
+        self.plays(system)
+            && self
+                .games
+                .iter()
+                .find(|(s, _)| s == system)
+                .is_none_or(|(_, list)| list.contains_key(game))
+    }
+
+    /// What it lists `game` of `system` as, if it lists it.
+    pub fn unit(&self, system: &str, game: &str) -> Option<&Unit> {
+        self.games
+            .iter()
+            .find(|(s, _)| s == system)
+            .and_then(|(_, list)| list.get(game))
+    }
+
     /// The options that apply to `system`'s games.
     pub fn options_for<'a>(&'a self, system: &'a str) -> impl Iterator<Item = &'a EmuOption> {
         self.options.iter().filter(move |o| o.applies(system))
@@ -373,6 +447,16 @@ impl Emulator {
                 delete: a.delete,
             })
             .collect();
+        // A list that can't be read lists nothing: the emulator takes none of that system's
+        // games until it can.
+        let games = d
+            .games
+            .into_iter()
+            .map(|(system, file)| {
+                let text = std::fs::read_to_string(&file).unwrap_or_default();
+                (system, units(&text))
+            })
+            .collect();
         Ok(Some(Emulator {
             id: id.to_owned(),
             name: d.name,
@@ -383,6 +467,7 @@ impl Emulator {
             quit_on_output: d.quit_on_output.filter(|s| !s.is_empty()),
             options,
             actions,
+            games,
         }))
     }
 }
@@ -473,6 +558,20 @@ impl Emulators {
             .and_then(|id| self.get(id))
             .filter(|e| e.plays(system))
             .or_else(|| self.all.iter().find(|e| e.plays(system)))
+    }
+
+    /// As [`Emulators::choose`], for one game (its ROM's name without the extension): `wanted`
+    /// if it takes the game, else the highest-priority one that does ([`Emulator::takes`]).
+    pub fn choose_for(&self, system: &str, game: &str, wanted: Option<&str>) -> Option<&Emulator> {
+        wanted
+            .and_then(|id| self.get(id))
+            .filter(|e| e.takes(system, game))
+            .or_else(|| self.all.iter().find(|e| e.takes(system, game)))
+    }
+
+    /// What the first emulator that lists `game` of `system` calls it (`[games]`).
+    pub fn unit(&self, system: &str, game: &str) -> Option<&Unit> {
+        self.all.iter().find_map(|e| e.unit(system, game))
     }
 }
 
@@ -581,6 +680,46 @@ mod tests {
         assert!(load(&[("mgba", MGBA)], &[])
             .get("mgba")
             .is_some_and(|e| e.plays("GB")));
+    }
+
+    #[test]
+    fn games_listed_go_to_the_emulator_that_lists_them() {
+        let dir = crate::testing::TempDir::new("dslot-games");
+        let list = dir.path().join("units.tsv");
+        std::fs::write(
+            &list,
+            "# set\ttitle\tmodel\tyear\tseries\ngnw_dkjr\tDonkey Kong Jr.\tDJ-101\t1982\tNew Wide Screen\ngnw_ball\tBall\n\nno_title\n",
+        )
+        .unwrap();
+        let inktick = format!(
+            "name = \"inktick\"\npriority = 100\n[systems]\nGW = [\"/usr/bin/inktick\", \"{{rom}}\"]\n[games]\nGW = \"{}\"\n",
+            list.display()
+        );
+        let gw =
+            "name = \"gw\"\npriority = 50\n[systems]\nGW = [\"/usr/bin/nibcase\", \"{rom}\"]\n";
+        let emulators = load(&[("inktick", &inktick), ("nibcase-gw", gw)], &[]);
+        let chosen = |game, wanted| {
+            emulators
+                .choose_for("GW", game, wanted)
+                .map(|e| e.id.as_str())
+        };
+        // Listed: inktick, the higher priority. Not listed: the next that takes it, even when
+        // inktick is asked for.
+        assert_eq!(chosen("gnw_dkjr", None), Some("inktick"));
+        assert_eq!(chosen("gnw_mario", None), Some("nibcase-gw"));
+        assert_eq!(chosen("gnw_mario", Some("inktick")), Some("nibcase-gw"));
+        assert_eq!(chosen("gnw_dkjr", Some("nibcase-gw")), Some("nibcase-gw"));
+        let unit = emulators.unit("GW", "gnw_dkjr").unwrap();
+        assert_eq!(
+            (unit.title.as_str(), unit.model.as_str(), unit.year.as_str()),
+            ("Donkey Kong Jr.", "DJ-101", "1982")
+        );
+        assert_eq!(emulators.unit("GW", "gnw_ball").unwrap().series, "");
+        assert!(emulators.unit("GW", "no_title").is_none());
+        // A list that isn't there: it takes none of the system's games.
+        let gone = inktick.replace(&list.display().to_string(), "/nowhere/units.tsv");
+        let emulators = load(&[("inktick", &gone)], &[]);
+        assert!(emulators.choose_for("GW", "gnw_dkjr", None).is_none());
     }
 
     #[test]

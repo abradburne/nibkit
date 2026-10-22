@@ -2,6 +2,10 @@
 
 ## 0.1.0 (unreleased)
 
+- `dslot`: `[games]` in a description names a file listing the only games it plays of a
+  system (name, title, model, year, series, tab-separated): `Emulator::takes`,
+  `Emulators::choose_for`, `Emulators::unit` and `Unit`, for an emulator that plays some of a
+  system's games (inktick, Game & Watch).
 - `device::set_wifi` and `wifi` use nibOS's Wi-Fi switch, `nib wifi on|off|status` (the Wi-Fi
   radio alone, by rfkill; Bluetooth carries on), falling back to `nib net status` on an older
   nibOS. `device::network_up` (`nib net up`) brings BlueZ up for Bluetooth where the network

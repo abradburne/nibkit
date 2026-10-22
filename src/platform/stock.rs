@@ -47,8 +47,14 @@ pub const MENU_ON_RELEASE: bool = false;
 pub const AUDIO_RATE: u32 = 44_100;
 pub const AUDIO_BUFFER: u32 = 4096;
 
-/// The card in the TF2 slot, then the one the OS starts from.
-pub const ROM_ROOTS: &[&str] = &["/mnt/sdcard/Roms", "/mnt/mmc/Roms"];
+/// The card in the TF2 slot, then the one the OS starts from; on each, `Roms`, then slot CFW's
+/// `Games`.
+pub const ROM_ROOTS: &[&str] = &[
+    "/mnt/sdcard/Roms",
+    "/mnt/mmc/Roms",
+    "/mnt/sdcard/Games",
+    "/mnt/mmc/Games",
+];
 /// Beside Roms on the card the OS starts from, as on nibOS's ROMS partition.
 pub const SAVES_ROOT: &str = "/mnt/mmc/Saves";
 

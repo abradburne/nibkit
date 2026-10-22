@@ -44,7 +44,14 @@ pub const MENU_ON_RELEASE: bool = true;
 pub const AUDIO_RATE: u32 = 48_000;
 pub const AUDIO_BUFFER: u32 = 1024;
 
-pub const ROM_ROOTS: &[&str] = &["/mnt/roms/Roms", "/mnt/ds/Roms"];
+/// Each card's `Roms`, then its `Games`: a card set up for slot CFW keeps its games in
+/// `Games/<system>/`, and both layouts are read at once.
+pub const ROM_ROOTS: &[&str] = &[
+    "/mnt/roms/Roms",
+    "/mnt/ds/Roms",
+    "/mnt/roms/Games",
+    "/mnt/ds/Games",
+];
 pub const SAVES_ROOT: &str = "/mnt/roms/Saves";
 
 /// The backlights as nibos-hw names them: links to the kernel's backlight devices.

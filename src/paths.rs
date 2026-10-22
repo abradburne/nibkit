@@ -99,9 +99,30 @@ pub fn exe_dir() -> PathBuf {
 
 /// The `Roms` folders games are in, each with a folder per console in it (`NDS`, `GBA`, `GB`,
 /// `GBC`, ...), as the stock OS lays the cards out: on nibOS the ROMS partition of the card it
-/// starts from and the card in TF2.
+/// starts from and the card in TF2. After them, each card's `Games` folder, where a card set
+/// up for slot CFW keeps its games (`Games/GBA/...`): both layouts work at once. A ROM in both
+/// is the one in `Roms` ([`slot_copy`]).
 pub fn rom_roots() -> Vec<PathBuf> {
     platform::rom_roots()
+}
+
+/// Whether `rom` is in a slot CFW `Games/<system>/` folder and the same file is also in that
+/// card's `Roms/<system>/`, or the other card's: a copy to leave out of a list of games, the one
+/// in `Roms` standing for both.
+pub fn slot_copy(rom: &Path, roots: &[PathBuf]) -> bool {
+    let (Some(dir), Some(file)) = (rom.parent(), rom.file_name()) else {
+        return false;
+    };
+    let (Some(games), Some(system)) = (dir.parent(), dir.file_name()) else {
+        return false;
+    };
+    if games.file_name() != Some("Games".as_ref()) {
+        return false;
+    }
+    roots
+        .iter()
+        .filter(|r| r.file_name() == Some("Roms".as_ref()))
+        .any(|r| r.join(system).join(file).is_file())
 }
 
 /// Where games' saves go, a folder per console and one per game in it: `<root>/GBC/<ROM
@@ -131,6 +152,34 @@ mod tests {
         assert_eq!(dirs.config, Path::new("/home/u/.config/inkdot"));
         assert_eq!(dirs.cache, Path::new("/home/u/.cache/inkdot"));
         assert_eq!(dirs.data, Path::new("/data/inkdot"));
+    }
+
+    /// Two cards, one laid out as the stock OS does (`Roms/`), the other set up for slot CFW
+    /// (`Games/`) with a game that is in both.
+    #[test]
+    fn slot_layout() {
+        let dir = crate::testing::TempDir::new("slot-layout");
+        let (one, two) = (dir.path().join("one"), dir.path().join("two"));
+        let file = |p: PathBuf| {
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(&p, b"rom").unwrap();
+            p
+        };
+        let ours = file(one.join("Roms/GBA/Metroid Fusion.gba"));
+        let both = file(two.join("Games/GBA/Metroid Fusion.gba"));
+        let only = file(two.join("Games/GB/Tetris.gb"));
+        let roots = [
+            one.join("Roms"),
+            two.join("Roms"),
+            one.join("Games"),
+            two.join("Games"),
+        ];
+        assert!(slot_copy(&both, &roots));
+        assert!(!slot_copy(&only, &roots));
+        assert!(!slot_copy(&ours, &roots));
+        // Only a Games/ copy gives way, never one in Roms/.
+        let again = file(two.join("Roms/GBA/Metroid Fusion.gba"));
+        assert!(!slot_copy(&again, &roots));
     }
 
     #[test]

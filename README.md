@@ -62,7 +62,7 @@ the speakers' tuning, the network and powering off are the handheld's: `None`, o
 | `clock` | `hour12()`: nibOS's 12- or 24-hour preference (`~/.config/nibos/prefs.toml`, else the locale's habit); `format(h, m, hour12)`. |
 | `power` | The power menu's request (SIGUSR1 on a long press of power, nibOS): `watch()`, then `take()` once a frame. **A program DSlot starts saves its auto-resume state and exits on SIGTERM**: that is how a game is put away for the menu. |
 | `audio` | `ADVICE`: the sample rate and buffer size that suit the sound server: PipeWire at 48 kHz on nibOS; on the stock OS PulseAudio behind an ALSA shim that wants big buffers. |
-| `paths` | `AppDirs::new("app")`: config, data and cache folders (XDG on nibOS; beside the program on the stock OS). `rom_roots()`, `saves_root()`, `saves_dir()`. |
+| `paths` | `AppDirs::new("app")`: config, data and cache folders (XDG on nibOS; beside the program on the stock OS). `rom_roots()` (each card's `Roms`, then slot CFW's `Games`; `slot_copy()` tells a ROM in both), `saves_root()`, `saves_dir()`. |
 | `settings` | `Settings`: values at the system, a console and a game, each winning over the one before, in one TOML file; `Def` says what a setting takes, its levels and default. |
 | `dslot` (feature `dslot`) | For an emulator or app that DSlot starts: its description file's types, parsing and checks, where descriptions go, the placeholders and saves-folder convention. |
 

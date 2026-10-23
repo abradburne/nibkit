@@ -542,6 +542,18 @@ impl Emulators {
         Emulators { all }
     }
 
+    /// Every system an installed emulator plays, by its folder name (`NDS`, `GBA`, `PORTS`...),
+    /// sorted: the `Roms/<system>` folders a card should have. The one list of them, for DSlot
+    /// and nibOS alike.
+    pub fn systems(&self) -> Vec<String> {
+        let set: std::collections::BTreeSet<&str> = self
+            .all
+            .iter()
+            .flat_map(|e| e.commands.iter().map(|(s, _)| s.as_str()))
+            .collect();
+        set.into_iter().map(str::to_owned).collect()
+    }
+
     /// The emulator with this id, if it is installed.
     pub fn get(&self, id: &str) -> Option<&Emulator> {
         self.all.iter().find(|e| e.id == id)
@@ -663,6 +675,18 @@ mod tests {
         assert!(!e.plays("GB"));
         assert_eq!(e.env, [("DS_DEBUG".to_owned(), "marks".to_owned())]);
         assert_eq!(e.seed[0].to, Path::new("~/.config/dsperate/dsperate.ini"));
+    }
+
+    /// The systems the installed emulators play, each once: the folders a card should have.
+    #[test]
+    fn systems() {
+        let both = load(&[("dsperate", DSPERATE), ("mgba", MGBA)], &[]);
+        let systems = both.systems();
+        assert!(systems.windows(2).all(|w| w[0] < w[1]), "{systems:?}");
+        assert!(systems.iter().any(|s| s == "NDS") && systems.iter().any(|s| s == "GB"));
+        // Not installed: its systems aren't there.
+        let one = load(&[("dsperate", DSPERATE), ("mgba", MGBA)], &["/usr/bin/dsperate"]);
+        assert!(!one.systems().iter().any(|s| s == "NDS"));
     }
 
     #[test]

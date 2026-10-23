@@ -214,6 +214,14 @@ mod linux {
         }
     }
 
+    /// Its descriptor, to wait on with `poll(2)` (it is non-blocking): readable when a finger
+    /// came down, moved or lifted.
+    impl std::os::fd::AsRawFd for Panel {
+        fn as_raw_fd(&self) -> std::os::fd::RawFd {
+            self.fd
+        }
+    }
+
     impl Drop for Panel {
         fn drop(&mut self) {
             // SAFETY: our own descriptor, not used again.

@@ -52,6 +52,51 @@ impl From<zbus::Error> for Error {
     }
 }
 
+/// A daemon's objects and their interfaces' properties, by path.
+#[cfg(feature = "net-control")]
+pub(crate) type Objects = std::collections::HashMap<
+    zbus::zvariant::OwnedObjectPath,
+    std::collections::HashMap<
+        String,
+        std::collections::HashMap<String, zbus::zvariant::OwnedValue>,
+    >,
+>;
+
+/// `dest`'s objects (`GetManagedObjects` on its `/`), without the bus starting the daemon to
+/// answer: D-Bus activation, which iwd and BlueZ both have, would start it and with it the
+/// radio's driver, Wi-Fi coming up because a menu looked. A daemon that isn't running is
+/// `ServiceUnknown`. Only turning a radio on (`nib wifi on`, `nib net up`) starts things.
+#[cfg(feature = "net-control")]
+pub(crate) fn managed_objects(
+    bus: &zbus::blocking::Connection,
+    dest: &'static str,
+) -> Result<Objects, Error> {
+    use zbus::names::OwnedInterfaceName;
+    use zbus::proxy::MethodFlags;
+    use zbus::zvariant::{OwnedObjectPath, OwnedValue};
+    let om = zbus::blocking::Proxy::new(bus, dest, "/", "org.freedesktop.DBus.ObjectManager")?;
+    type Raw = std::collections::HashMap<
+        OwnedObjectPath,
+        std::collections::HashMap<
+            OwnedInterfaceName,
+            std::collections::HashMap<String, OwnedValue>,
+        >,
+    >;
+    let found: Option<Raw> =
+        om.call_with_flags("GetManagedObjects", MethodFlags::NoAutoStart.into(), &())?;
+    Ok(found
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(path, ifaces)| {
+            let ifaces = ifaces
+                .into_iter()
+                .map(|(i, props)| (i.to_string(), props))
+                .collect();
+            (path, ifaces)
+        })
+        .collect())
+}
+
 #[cfg(feature = "net-control")]
 impl From<zbus::fdo::Error> for Error {
     fn from(e: zbus::fdo::Error) -> Error {

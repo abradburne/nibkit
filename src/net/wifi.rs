@@ -107,26 +107,9 @@ pub struct Wifi {
     station: OwnedObjectPath,
 }
 
-type Objects = HashMap<OwnedObjectPath, HashMap<String, HashMap<String, OwnedValue>>>;
-
-fn objects(bus: &Connection) -> Result<Objects, Error> {
-    let om = Proxy::new(bus, IWD, "/", "org.freedesktop.DBus.ObjectManager")?;
-    let found: HashMap<
-        OwnedObjectPath,
-        HashMap<zbus::names::OwnedInterfaceName, HashMap<String, OwnedValue>>,
-    > = om.call("GetManagedObjects", &())?;
-    Ok(found
-        .into_iter()
-        .map(|(path, ifaces)| {
-            (
-                path,
-                ifaces
-                    .into_iter()
-                    .map(|(i, props)| (i.to_string(), props))
-                    .collect(),
-            )
-        })
-        .collect())
+/// iwd's objects. Never starts iwd: a stopped one (Wi-Fi off) is `ServiceUnknown`.
+fn objects(bus: &Connection) -> Result<super::Objects, Error> {
+    super::managed_objects(bus, IWD)
 }
 
 fn string(props: &HashMap<String, OwnedValue>, key: &str) -> Option<String> {
@@ -212,9 +195,15 @@ impl Wifi {
 
     /// The networks in range, strongest first.
     pub fn networks(&self) -> Result<Vec<Network>, Error> {
+        // As every read: not starting iwd again if it has stopped since (objects()).
         let ordered: Vec<(OwnedObjectPath, i16)> = self
             .proxy(&self.station, "net.connman.iwd.Station")?
-            .call("GetOrderedNetworks", &())?;
+            .call_with_flags(
+                "GetOrderedNetworks",
+                zbus::proxy::MethodFlags::NoAutoStart.into(),
+                &(),
+            )?
+            .unwrap_or_default();
         let found = objects(&self.bus)?;
         Ok(ordered
             .into_iter()

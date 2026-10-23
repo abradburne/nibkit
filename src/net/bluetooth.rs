@@ -128,8 +128,6 @@ pub struct Bluetooth {
     bus: Connection,
 }
 
-type Objects = HashMap<OwnedObjectPath, HashMap<String, HashMap<String, OwnedValue>>>;
-
 fn string(props: &HashMap<String, OwnedValue>, key: &str) -> Option<String> {
     props
         .get(key)
@@ -180,24 +178,9 @@ impl Bluetooth {
         }
     }
 
-    fn objects(&self) -> Result<Objects, Error> {
-        let om = Proxy::new(&self.bus, BLUEZ, "/", "org.freedesktop.DBus.ObjectManager")?;
-        let found: HashMap<
-            OwnedObjectPath,
-            HashMap<zbus::names::OwnedInterfaceName, HashMap<String, OwnedValue>>,
-        > = om.call("GetManagedObjects", &())?;
-        Ok(found
-            .into_iter()
-            .map(|(path, ifaces)| {
-                (
-                    path,
-                    ifaces
-                        .into_iter()
-                        .map(|(i, props)| (i.to_string(), props))
-                        .collect(),
-                )
-            })
-            .collect())
+    /// BlueZ's objects. Never starts BlueZ, which nibOS's network does (`nib net`).
+    fn objects(&self) -> Result<super::Objects, Error> {
+        super::managed_objects(&self.bus, BLUEZ)
     }
 
     fn proxy(&self, path: &OwnedObjectPath, iface: &'static str) -> Result<Proxy<'_>, Error> {
@@ -216,12 +199,19 @@ impl Bluetooth {
 
     /// Whether the radio is on: off while there is no adapter.
     pub fn powered(&self) -> Result<bool, Error> {
-        let Ok(adapter) = self.adapter() else {
+        // From BlueZ's objects (objects()), so that the reading never starts BlueZ.
+        let Ok(found) = self.objects() else {
             return Ok(false);
         };
-        Ok(self
-            .proxy(&adapter, "org.bluez.Adapter1")?
-            .get_property("Powered")?)
+        let mut adapters: Vec<_> = found
+            .iter()
+            .filter_map(|(p, i)| Some((p, i.get("org.bluez.Adapter1")?)))
+            .collect();
+        adapters.sort_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
+        Ok(adapters
+            .first()
+            .and_then(|(_, props)| boolean(props, "Powered"))
+            .unwrap_or(false))
     }
 
     /// Turns the radio on or off (off disconnects everything). Off with no adapter (BlueZ

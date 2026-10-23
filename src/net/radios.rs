@@ -217,17 +217,24 @@ mod real {
                 Err(RecvTimeoutError::Timeout) => None,
                 Err(RecvTimeoutError::Disconnected) => return,
             };
-            // BlueZ isn't running while nibOS's network is down (its modes bring it up on
-            // demand): Bluetooth on brings it up first, and waits for the adapter.
-            if what == Some(Do::Power(true)) && bt.as_ref().is_none_or(|b| !b.present()) {
-                crate::device::network_up();
-                bt = None;
-                for _ in 0..20 {
-                    if let Ok(b) = Bluetooth::open().and_then(|b| b.powered().map(|_| b)) {
-                        bt = Some(b);
-                        break;
+            // Bluetooth on: nibOS's switch (`nib bluetooth on`, which brings the network up if it
+            // has to and unblocks the radio, kept across restarts), or on an older nibOS the
+            // network up (BlueZ isn't running while it is down); then wait for the adapter.
+            if what == Some(Do::Power(true)) {
+                let switched = crate::device::set_bluetooth(true);
+                let absent = bt.as_ref().is_none_or(|b| !b.present());
+                if !switched && absent {
+                    crate::device::network_up();
+                }
+                if absent {
+                    bt = None;
+                    for _ in 0..20 {
+                        if let Ok(b) = Bluetooth::open().and_then(|b| b.powered().map(|_| b)) {
+                            bt = Some(b);
+                            break;
+                        }
+                        std::thread::sleep(Duration::from_millis(500));
                     }
-                    std::thread::sleep(Duration::from_millis(500));
                 }
             }
             if bt.is_none() {
@@ -334,9 +341,18 @@ mod real {
                 wifi.forget(&known).map_err(err)?;
                 Ok(format!("Forgot {name}"))
             }
-            Do::Power(on) => {
+            Do::Power(true) => {
                 let bt = bt.ok_or("Bluetooth isn't there")?;
-                bt.set_powered(*on).map_err(err)?;
+                bt.set_powered(true).map_err(err)?;
+                Ok(String::new())
+            }
+            // Off: BlueZ's Powered, then nibOS's switch, which blocks the radio and keeps it so.
+            // Without the switch (an older nibOS), Powered alone, and it has to have worked.
+            Do::Power(false) => {
+                let off = bt.map(|b| b.set_powered(false));
+                if !crate::device::set_bluetooth(false) {
+                    off.ok_or("Bluetooth isn't there")?.map_err(err)?;
+                }
                 Ok(String::new())
             }
             Do::Look(on) => {
@@ -435,7 +451,11 @@ mod real {
     }
 
     fn read_bt(bt: &Bluetooth, looking: bool) -> Option<BluetoothNow> {
-        let powered = bt.powered().ok()?;
+        // The switch is nibOS's where it has one; BlueZ's Powered where it doesn't.
+        let powered = match crate::device::bluetooth() {
+            Some(on) => on,
+            None => bt.powered().ok()?,
+        };
         let devices = bt
             .devices()
             .unwrap_or_default()

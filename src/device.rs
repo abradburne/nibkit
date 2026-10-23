@@ -151,6 +151,23 @@ pub fn set_wifi(on: bool) {
     }
 }
 
+/// Whether Bluetooth's switch is on: nibOS's (`nib bluetooth status`, rfkill, kept across
+/// restarts). `None` on a nibOS older than it, where the switch is BlueZ's `Powered` alone.
+pub fn bluetooth() -> Option<bool> {
+    Some(nib(&["bluetooth", "status"])? == "on")
+}
+
+/// Turns Bluetooth on or off with nibOS's switch (`nib bluetooth`: on brings the network up
+/// where it isn't, then unblocks the radio; off blocks it; the choice is kept across restarts).
+/// Blocks until done. `false` where there is no such switch (an older nibOS): then BlueZ's
+/// `Powered` is all there is.
+pub fn set_bluetooth(on: bool) -> bool {
+    let way = if on { "on" } else { "off" };
+    let done = platform::NETWORK.is_some_and(|nib| run(Command::new(nib).args(["bluetooth", way])));
+    crate::net::refresh();
+    done
+}
+
 /// Brings nibOS's network up (both radios' daemons, iwd and BlueZ: `nib net up`), where its
 /// mode left it down, and returns when it has. Wi-Fi stays off if it was: its switch is set
 /// off first, which `nib net up` keeps.

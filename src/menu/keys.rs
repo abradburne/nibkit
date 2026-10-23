@@ -225,6 +225,9 @@ pub enum Button {
     R,
 }
 
+/// A key placed: its row, its place in the row, what it is, and its box.
+type Placed = (usize, usize, Cap, (f32, f32, f32, f32));
+
 /// The keyboard's place on the screen.
 const HINT_H: f32 = 44.0;
 const ROWS: usize = 6;
@@ -305,7 +308,7 @@ impl Keys {
     }
 
     /// Each key's place: its row, its place in the row, what it is, and its box.
-    fn boxes(&self) -> Vec<(usize, usize, Cap, (f32, f32, f32, f32))> {
+    fn boxes(&self) -> Vec<Placed> {
         let unit = (W - 2.0 * SIDE) / UNITS;
         let row_h = (H - HINT_H - SIDE) / ROWS as f32;
         let mut out = Vec::new();

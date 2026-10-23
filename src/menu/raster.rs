@@ -51,6 +51,12 @@ impl Fonts {
     }
 
     /// A line's width at `size` pixels.
+    /// Whether the face has a glyph for `c` (not the blank box a missing one draws).
+    pub fn has(&self, c: char, bold: bool) -> bool {
+        let face = if bold { &self.bold } else { &self.regular };
+        face.lookup_glyph_index(c) != 0
+    }
+
     pub fn width(&self, s: &str, size: f32, bold: bool) -> f32 {
         let f = self.face(bold);
         s.chars().map(|c| f.metrics(c, size).advance_width).sum()
@@ -464,6 +470,18 @@ fn star(cx: f32, cy: f32, r: f32) -> Vec<(f32, f32)> {
 mod tests {
     use super::*;
     use crate::menu::{layout, Menu, Row, Status, Value};
+
+    /// Roboto Condensed has the bullet a hidden passphrase is drawn in, but no backspace sign:
+    /// why the keyboard's Delete key is a drawn glyph.
+    #[test]
+    fn font_coverage() {
+        let fonts = Fonts::new();
+        for bold in [false, true] {
+            assert!(fonts.has('•', bold));
+            assert!(fonts.has('a', bold));
+            assert!(!fonts.has('⌫', bold));
+        }
+    }
 
     fn at(c: &Canvas, x: usize, y: usize) -> [u8; 3] {
         let i = (y * c.w + x) * 4;

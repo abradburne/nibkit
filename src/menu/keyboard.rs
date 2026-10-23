@@ -18,6 +18,7 @@
 //! ```
 
 use super::colour::{self, Rgb};
+use super::glyphs::Glyph;
 use super::layout::Draw;
 use super::{H, W};
 
@@ -313,6 +314,22 @@ impl Keyboard {
         }
     }
 
+    /// A key's label, in letters every font has; none for Delete, which is drawn
+    /// ([`Glyph::Backspace`]).
+    fn label(&self, cap: Cap) -> Option<String> {
+        let pick = |on: bool, yes: &str, no: &str| if on { yes } else { no }.to_owned();
+        Some(match cap {
+            Cap::Char(c) => c.to_string(),
+            Cap::Shift => pick(self.symbols, "more", "shift"),
+            Cap::Symbols => pick(self.symbols, "abc", "?123"),
+            Cap::Space => "space".into(),
+            Cap::Delete => return None,
+            Cap::Show => pick(self.shown, "hide", "show"),
+            Cap::Cancel => "Cancel".into(),
+            Cap::Done => "Done".into(),
+        })
+    }
+
     /// What the field shows: [`Keyboard::shown_text`], less as much of its start as it takes
     /// for the rest and the caret to fit in the field.
     fn field_text(&self, width: &impl Fn(&str, f32, bool) -> f32) -> String {
@@ -416,33 +433,17 @@ impl Keyboard {
                     colour: colour::WHITE,
                 });
             }
-            let label = match cap {
-                Cap::Char(c) => c.to_string(),
-                Cap::Shift => {
-                    if self.symbols {
-                        "more".into()
-                    } else {
-                        "shift".into()
-                    }
-                }
-                Cap::Symbols => {
-                    if self.symbols {
-                        "abc".into()
-                    } else {
-                        "?123".into()
-                    }
-                }
-                Cap::Space => "space".into(),
-                Cap::Delete => "⌫".into(),
-                Cap::Show => {
-                    if self.shown {
-                        "hide".into()
-                    } else {
-                        "show".into()
-                    }
-                }
-                Cap::Cancel => "Cancel".into(),
-                Cap::Done => "Done".into(),
+            // Delete is drawn, not lettered: no font is sure to have a backspace sign.
+            let Some(label) = self.label(cap) else {
+                let g = 30.0;
+                let glyph = Glyph::Backspace(on);
+                out.push(Draw::Glyph {
+                    glyph,
+                    x: x + (w - glyph.width(g)) / 2.0,
+                    y: y + (h - g) / 2.0,
+                    h: g,
+                });
+                continue;
             };
             let ink = if on && cap != Cap::Done {
                 colour::TAB_INK
@@ -523,6 +524,81 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// Every layout has a Delete key, drawn rather than lettered, and every key's label is
+    /// in Roboto Condensed (no blank keys). Tapping Delete deletes.
+    #[cfg(feature = "menu-raster")]
+    #[test]
+    fn every_key_visible() {
+        let fonts = super::super::raster::Fonts::new();
+        for purpose in [Purpose::Text, Purpose::Secret, Purpose::Digits] {
+            for (shift, symbols) in [(false, false), (true, false), (false, true), (true, true)] {
+                let mut kb = Keyboard::new("Passphrase", purpose, 63);
+                kb.shift = shift;
+                kb.symbols = symbols;
+                let draws = kb.draws();
+                let deletes = draws
+                    .iter()
+                    .filter(|d| {
+                        matches!(
+                            d,
+                            Draw::Glyph {
+                                glyph: Glyph::Backspace(_),
+                                ..
+                            }
+                        )
+                    })
+                    .count();
+                assert_eq!(deletes, 1, "{purpose:?} shift {shift} symbols {symbols}");
+                for d in &draws {
+                    if let Draw::Text { text, bold, .. } = d {
+                        for c in text.chars() {
+                            assert!(
+                                fonts.has(c, *bold),
+                                "{purpose:?}: {c:?} in {text:?} isn't in the font"
+                            );
+                        }
+                    }
+                }
+                // A tap on Delete takes the last character away.
+                kb.type_char('a');
+                kb.type_char('b');
+                let (_, _, _, (x, y, w, h)) =
+                    kb.boxes().into_iter().find(|b| b.2 == Cap::Delete).unwrap();
+                kb.touch(x + w / 2.0, y + h / 2.0);
+                assert_eq!(kb.shown_text().chars().count(), 1, "{purpose:?}");
+            }
+        }
+    }
+
+    /// The passphrase screen with a few dots typed, written as raw RGBA to
+    /// `$NIBKIT_RENDERS/keyboard-<name>.rgba` (1024 x 768) when that's set, to look at.
+    #[cfg(feature = "menu-raster")]
+    #[test]
+    fn render_passphrase() {
+        let Some(dir) = std::env::var_os("NIBKIT_RENDERS") else {
+            return;
+        };
+        let fonts = super::super::raster::Fonts::new();
+        let mut kb = Keyboard::new("Passphrase for Home", Purpose::Secret, 63);
+        for c in "hunter2".chars() {
+            kb.type_char(c);
+        }
+        let shot = |kb: &Keyboard, name: &str| {
+            let mut canvas = super::super::raster::Canvas::new(1.0);
+            let draws = kb.draws_measured(|s, size, bold| fonts.width(s, size, bold));
+            canvas.draw(&fonts, &draws, |_| None);
+            let path = std::path::Path::new(&dir).join(format!("keyboard-{name}.rgba"));
+            std::fs::write(path, &canvas.px).unwrap();
+        };
+        shot(&kb, "secret");
+        // With Delete highlighted (from the buttons), and with the passphrase shown.
+        let at = kb.boxes().into_iter().find(|b| b.2 == Cap::Delete).unwrap();
+        kb.at = (at.0, at.1);
+        shot(&kb, "delete-lit");
+        kb.key(Key::Y);
+        shot(&kb, "shown");
     }
 
     #[test]

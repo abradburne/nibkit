@@ -17,6 +17,9 @@ pub enum Glyph {
     Check,
     /// A battery's charge, in percent.
     Battery(u8),
+    /// Delete (the keyboard's backspace key): a tag pointing left with a cross in it. Dark
+    /// (in the dim colour) for a key lit white.
+    Backspace(bool),
 }
 
 impl Glyph {
@@ -27,6 +30,7 @@ impl Glyph {
             Glyph::Lock => 0.75,
             Glyph::Check => 0.95,
             Glyph::Battery(_) => 2.1,
+            Glyph::Backspace(_) => 1.5,
         }
     }
 }
@@ -107,6 +111,23 @@ fn shade(glyph: Glyph, u: f32, v: f32) -> Option<bool> {
             (d < 0.075).then_some(true)
         }
         Glyph::Battery(_) => None,
+        Glyph::Backspace(dark) => {
+            // The tag: a point at the left, a body to the right, drawn as an outline.
+            let tag = |inset: f32| {
+                let (top, bottom, right) = (0.18 + inset, 0.82 - inset, 1.42 - inset);
+                let half = 0.32;
+                let off = (v - 0.5).abs();
+                let left = 0.08 + inset * 1.4 + (off / half) * (0.45 - 0.08);
+                (top..bottom).contains(&v) && u <= right && u >= left
+            };
+            let outline = tag(0.0) && !tag(0.08);
+            // The cross, in the body.
+            let (cx, cy, arm) = (0.93, 0.5, 0.15);
+            let cross = (u - cx).abs() <= arm
+                && (v - cy).abs() <= arm
+                && ((u - cx) - (v - cy)).abs().min(((u - cx) + (v - cy)).abs()) < 0.075;
+            (outline || cross).then_some(!dark)
+        }
     }
 }
 
@@ -137,7 +158,12 @@ mod tests {
 
     #[test]
     fn lock_and_check_have_ink() {
-        for g in [Glyph::Lock, Glyph::Check] {
+        for g in [
+            Glyph::Lock,
+            Glyph::Check,
+            Glyph::Backspace(false),
+            Glyph::Backspace(true),
+        ] {
             let (w, px) = render(g, 30, [255; 3], [0; 3]);
             assert!(px.chunks(4).any(|p| p[3] == 255), "{g:?}");
             assert_eq!(w, g.width(30.0).ceil() as usize);

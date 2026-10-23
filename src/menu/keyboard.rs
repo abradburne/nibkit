@@ -21,6 +21,10 @@ use super::colour::{self, Rgb};
 use super::layout::Draw;
 use super::{H, W};
 
+/// Where typed text starts in its field, and the furthest its caret goes, in screen units.
+const FIELD_LEFT: f32 = 74.0;
+const FIELD_RIGHT: f32 = W - 74.0 - 16.0;
+
 /// What is being typed, which picks the keys and whether it is shown.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Purpose {
@@ -309,8 +313,29 @@ impl Keyboard {
         }
     }
 
-    /// The keyboard laid out on the 1024 × 768 touch screen.
+    /// What the field shows: [`Keyboard::shown_text`], less as much of its start as it takes
+    /// for the rest and the caret to fit in the field.
+    fn field_text(&self, width: &impl Fn(&str, f32, bool) -> f32) -> String {
+        let shown = self.shown_text();
+        let room = FIELD_RIGHT - FIELD_LEFT;
+        let from = shown
+            .char_indices()
+            .map(|(i, _)| i)
+            .find(|&i| width(&shown[i..], 40.0, true) <= room)
+            .unwrap_or(shown.len());
+        shown[from..].to_owned()
+    }
+
+    /// The keyboard laid out on the 1024 × 768 touch screen. The caret goes after an estimate
+    /// of the typed text's width; [`Keyboard::draws_measured`] places it exactly.
     pub fn draws(&self) -> Vec<Draw> {
+        self.draws_measured(|s, size, _| s.chars().count() as f32 * size * 0.45)
+    }
+
+    /// [`Keyboard::draws`], with `width(text, size, bold)` saying how wide text is drawn, in
+    /// screen units: the caret goes just after what is shown (the dots of a hidden secret, or
+    /// its letters when shown), and text too long for the field shows its end.
+    pub fn draws_measured(&self, width: impl Fn(&str, f32, bool) -> f32) -> Vec<Draw> {
         let text =
             |s: &str, size: f32, bold: bool, x: f32, y: f32, anchor: f32, colour: Rgb| Draw::Text {
                 text: s.to_owned(),
@@ -338,13 +363,14 @@ impl Keyboard {
             radius: 12.0,
             colour: colour::PANEL,
         });
-        let shown = self.shown_text();
-        out.push(text(&shown, 40.0, true, 74.0, 96.0, 0.0, colour::WHITE));
+        let (left, size) = (FIELD_LEFT, 40.0);
+        let shown = self.field_text(&width);
+        out.push(text(&shown, size, true, left, 96.0, 0.0, colour::WHITE));
         out.push(text(
             "|",
-            40.0,
+            size,
             false,
-            74.0 + 21.0 * shown.chars().count() as f32,
+            left + width(&shown, size, true),
             94.0,
             0.0,
             colour::GOLD,
@@ -445,6 +471,59 @@ impl Keyboard {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The caret sits just after what the field draws, whatever is typed: dots for a hidden
+    /// secret, its letters once shown, plain text, and the end of text longer than the field.
+    #[test]
+    fn caret_after_what_is_drawn() {
+        // Each character as wide as its own: a dot narrower than any letter, as in the font.
+        let width = |s: &str, size: f32, _: bool| {
+            s.chars()
+                .map(|c| match c {
+                    '•' => 0.3,
+                    'W' | 'M' => 0.8,
+                    c if c.is_ascii_digit() => 0.5,
+                    _ => 0.45,
+                })
+                .sum::<f32>()
+                * size
+        };
+        let typed_and_caret = |kb: &Keyboard| {
+            let draws = kb.draws_measured(width);
+            let texts: Vec<(String, f32, f32)> = draws
+                .iter()
+                .filter_map(|d| match d {
+                    Draw::Text { text, x, size, .. } => Some((text.clone(), *x, *size)),
+                    _ => None,
+                })
+                .collect();
+            let caret = texts.iter().position(|(t, ..)| t == "|").unwrap();
+            (texts[caret - 1].clone(), texts[caret].1)
+        };
+        for purpose in [Purpose::Secret, Purpose::Text] {
+            for show in [false, true] {
+                let mut kb = Keyboard::new("Passphrase", purpose, 63);
+                if show {
+                    kb.key(Key::Y);
+                }
+                for n in 0..=40 {
+                    let ((typed, x, size), caret) = typed_and_caret(&kb);
+                    assert_eq!(caret, x + width(&typed, size, true), "{purpose:?} {n}");
+                    assert!(caret <= FIELD_RIGHT, "{purpose:?} {n}: past the field");
+                    if purpose == Purpose::Secret && !show {
+                        assert!(typed.chars().all(|c| c == '•'));
+                    }
+                    kb.type_char(if n % 3 == 0 { 'W' } else { 'a' });
+                }
+                // Deleting brings the caret back with the text.
+                for _ in 0..25 {
+                    kb.key(Key::B);
+                    let ((typed, x, size), caret) = typed_and_caret(&kb);
+                    assert_eq!(caret, x + width(&typed, size, true));
+                }
+            }
+        }
+    }
 
     #[test]
     fn typing_with_the_buttons() {

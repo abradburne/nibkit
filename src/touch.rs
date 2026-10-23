@@ -54,6 +54,14 @@ impl Panel {
     pub fn poll(&mut self, _out: &mut Vec<Pointer>) {}
 }
 
+/// No descriptor: there is no panel (`poll(2)` passes over a negative one).
+#[cfg(nibkit_desktop)]
+impl std::os::fd::AsRawFd for Panel {
+    fn as_raw_fd(&self) -> std::os::fd::RawFd {
+        -1
+    }
+}
+
 #[cfg(not(nibkit_desktop))]
 mod linux {
     use super::Pointer;

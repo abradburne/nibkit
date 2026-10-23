@@ -64,6 +64,7 @@ the speakers' tuning, the network and powering off are the handheld's: `None`, o
 | `audio` | `ADVICE`: the sample rate and buffer size that suit the sound server: PipeWire at 48 kHz on nibOS; on the stock OS PulseAudio behind an ALSA shim that wants big buffers. |
 | `paths` | `AppDirs::new("app")`: config, data and cache folders (XDG on nibOS; beside the program on the stock OS). `rom_roots()` (each card's `Roms`, then slot CFW's `Games`; `slot_copy()` tells a ROM in both), `saves_root()`, `saves_dir()`. |
 | `settings` | `Settings`: values at the system, a console and a game, each winning over the one before, in one TOML file; `Def` says what a setting takes, its levels and default. |
+| `menu::keyboard`, `menu::keys` (feature `menu`) | Two touch keyboards: `keyboard` types a string (a passphrase, a name: `Typed::Done`), `keys` is a terminal's keyboard giving Linux key codes pressed and released, with Shift, Ctrl, Alt and Fn, for a uinput device (nibos-keys, the console's). Both `draws()` like the menu. |
 | `dslot` (feature `dslot`) | For an emulator or app that DSlot starts: its description file's types, parsing and checks, where descriptions go, the placeholders and saves-folder convention. |
 
 ## A plain app

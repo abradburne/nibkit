@@ -685,7 +685,10 @@ mod tests {
         assert!(systems.windows(2).all(|w| w[0] < w[1]), "{systems:?}");
         assert!(systems.iter().any(|s| s == "NDS") && systems.iter().any(|s| s == "GB"));
         // Not installed: its systems aren't there.
-        let one = load(&[("dsperate", DSPERATE), ("mgba", MGBA)], &["/usr/bin/dsperate"]);
+        let one = load(
+            &[("dsperate", DSPERATE), ("mgba", MGBA)],
+            &["/usr/bin/dsperate"],
+        );
         assert!(!one.systems().iter().any(|s| s == "NDS"));
     }
 

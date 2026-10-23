@@ -50,13 +50,12 @@ impl Fonts {
         }
     }
 
-    /// A line's width at `size` pixels.
     /// Whether the face has a glyph for `c` (not the blank box a missing one draws).
     pub fn has(&self, c: char, bold: bool) -> bool {
-        let face = if bold { &self.bold } else { &self.regular };
-        face.lookup_glyph_index(c) != 0
+        self.face(bold).lookup_glyph_index(c) != 0
     }
 
+    /// A line's width at `size` pixels.
     pub fn width(&self, s: &str, size: f32, bold: bool) -> f32 {
         let f = self.face(bold);
         s.chars().map(|c| f.metrics(c, size).advance_width).sum()

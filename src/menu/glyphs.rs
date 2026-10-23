@@ -20,6 +20,21 @@ pub enum Glyph {
     /// Delete (the keyboard's backspace key): a tag pointing left with a cross in it. Dark
     /// (in the dim colour) for a key lit white.
     Backspace(bool),
+    /// An arrow key's arrow, which way it points; dark for a key lit white.
+    Arrow(Dir, bool),
+}
+
+/// Which way an arrow points.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Dir {
+    /// Up.
+    Up,
+    /// Down.
+    Down,
+    /// Left.
+    Left,
+    /// Right.
+    Right,
 }
 
 impl Glyph {
@@ -31,6 +46,7 @@ impl Glyph {
             Glyph::Check => 0.95,
             Glyph::Battery(_) => 2.1,
             Glyph::Backspace(_) => 1.5,
+            Glyph::Arrow(..) => 1.0,
         }
     }
 }
@@ -128,6 +144,18 @@ fn shade(glyph: Glyph, u: f32, v: f32) -> Option<bool> {
                 && ((u - cx) - (v - cy)).abs().min(((u - cx) + (v - cy)).abs()) < 0.075;
             (outline || cross).then_some(!dark)
         }
+        Glyph::Arrow(dir, dark) => {
+            // Drawn pointing up, the point turned to face the other ways.
+            let (u, v) = match dir {
+                Dir::Up => (u, v),
+                Dir::Down => (u, 1.0 - v),
+                Dir::Left => (1.0 - v, u),
+                Dir::Right => (v, 1.0 - u),
+            };
+            let head = (0.12..=0.52).contains(&v) && (u - 0.5).abs() <= (v - 0.12) * 0.85;
+            let stem = (0.42..=0.58).contains(&u) && (0.45..=0.9).contains(&v);
+            (head || stem).then_some(!dark)
+        }
     }
 }
 
@@ -163,6 +191,8 @@ mod tests {
             Glyph::Check,
             Glyph::Backspace(false),
             Glyph::Backspace(true),
+            Glyph::Arrow(Dir::Up, false),
+            Glyph::Arrow(Dir::Left, true),
         ] {
             let (w, px) = render(g, 30, [255; 3], [0; 3]);
             assert!(px.chunks(4).any(|p| p[3] == 255), "{g:?}");

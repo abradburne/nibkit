@@ -9,6 +9,10 @@
 //! icon = "icon.png"                               # optional; icon.png if left out
 //! runs_on = ["nibos"]                   # "nibos", "stock", "desktop"; nibOS only if left out
 //! [env]                                           # optional
+//! [until]                     # optional: what it's called until `file` is there (~ is home),
+//! file = "~/.local/share/PortMaster/version"      # for an app that fetches itself first
+//! name = "Get PortMaster"
+//! description = "Downloads it over Wi-Fi"         # optional
 //! ```
 //!
 //! DSlot starts an app as it starts an emulator: it lets go of both screens and the sound,
@@ -44,6 +48,34 @@ pub struct App {
     /// Environment variables set for it.
     #[serde(default)]
     pub env: BTreeMap<String, String>,
+    /// What it is called until a file is there: an app that installs itself the first time.
+    #[serde(default)]
+    pub until: Option<Until>,
+}
+
+/// An app's name before it has installed itself: `name` (and `description`) while `file` is
+/// missing.
+#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Until {
+    /// The file that is there once it is installed; `~/` is the home folder.
+    pub file: String,
+    /// The name meanwhile ("Get PortMaster").
+    pub name: String,
+    /// The line under it meanwhile; the app's own if left out.
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+impl Until {
+    /// Whether `file` is there yet.
+    pub fn installed(&self) -> bool {
+        let path = match self.file.strip_prefix("~/") {
+            Some(rest) => PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(rest),
+            None => PathBuf::from(&self.file),
+        };
+        path.exists()
+    }
 }
 
 fn nibos_only() -> Vec<String> {
@@ -67,6 +99,22 @@ impl App {
             ));
         }
         Ok(app)
+    }
+
+    /// The name it goes by now: [`Until::name`] while it isn't installed yet.
+    pub fn shown_name(&self) -> &str {
+        match &self.until {
+            Some(u) if !u.installed() => &u.name,
+            _ => &self.name,
+        }
+    }
+
+    /// The line under the name now, as [`App::shown_name`].
+    pub fn shown_description(&self) -> Option<&str> {
+        match &self.until {
+            Some(u) if !u.installed() => u.description.as_deref().or(self.description.as_deref()),
+            _ => self.description.as_deref(),
+        }
     }
 
     /// Whether it runs on the system nibkit was built for.
@@ -144,7 +192,7 @@ pub fn apps(roots: &[PathBuf]) -> Vec<Found> {
             }
         }
     }
-    found.sort_by_key(|f| f.app.name.to_lowercase());
+    found.sort_by_key(|f| f.app.shown_name().to_lowercase());
     found
 }
 
@@ -166,6 +214,7 @@ fn stock_script(path: &Path) -> Option<Found> {
         icon: None,
         runs_on: vec!["stock".into()],
         env: BTreeMap::new(),
+        until: None,
     };
     Some(Found {
         icon: icon.is_file().then_some(icon),
@@ -179,6 +228,30 @@ fn stock_script(path: &Path) -> Option<Found> {
 mod tests {
     use super::*;
     use crate::testing::TempDir;
+
+    /// An app that fetches itself first goes by its `[until]` name until its file is there.
+    #[test]
+    fn until_installed() {
+        let dir = TempDir::new("apps-until");
+        let marker = dir.path().join("version");
+        let app = App::parse(&format!(
+            "name = \"PortMaster\"\ncommand = [\"/usr/bin/portmaster\"]\n\
+             [until]\nfile = \"{}\"\nname = \"Get PortMaster\"\n",
+            marker.display()
+        ))
+        .unwrap();
+        assert_eq!(app.shown_name(), "Get PortMaster");
+        assert_eq!(app.shown_description(), None);
+        std::fs::write(&marker, "1").unwrap();
+        assert_eq!(app.shown_name(), "PortMaster");
+        // ~/ is the home folder.
+        let home = Until {
+            file: "~/surely-not-there-nibkit".into(),
+            name: "x".into(),
+            description: None,
+        };
+        assert!(!home.installed());
+    }
 
     #[test]
     fn descriptions() {

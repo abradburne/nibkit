@@ -137,7 +137,12 @@ impl Wifi {
         }
         let bus = Connection::system()?;
         let found = objects(&bus).map_err(|e| match e {
-            Error::Failed(m) if m.contains("ServiceUnknown") || m.contains("not provided") => {
+            // Not running: ServiceUnknown, or NameHasNoOwner from a bus asked not to start it.
+            Error::Failed(m)
+                if ["ServiceUnknown", "NameHasNoOwner", "not provided"]
+                    .iter()
+                    .any(|k| m.contains(k)) =>
+            {
                 Error::Off
             }
             e => e,

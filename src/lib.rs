@@ -534,7 +534,11 @@ pub unsafe extern "C" fn nib_top_paused(
             }
         }
     }
-    c.draw(&m.fonts, &top::paused(&title, &subtitle), |_| None);
+    let fonts = &m.fonts;
+    let paused = top::paused_measured(&title, &subtitle, |s, size, bold| {
+        fonts.width(s, size, bold)
+    });
+    c.draw(fonts, &paused, |_| None);
     size_out(c, width, height);
     c.px.as_ptr()
 }
@@ -580,11 +584,11 @@ pub unsafe extern "C" fn nib_top_state(
         .collect();
     let c = &mut m.top;
     c.clear(nibkit::menu::colour::BLACK);
-    c.draw(
-        &m.fonts,
-        &top::state(&name, &under, &lines, pic.map(|_| 0)),
-        |_| pic,
-    );
+    let fonts = &m.fonts;
+    let state = top::state_measured(&name, &under, &lines, pic.map(|_| 0), |s, size, bold| {
+        fonts.width(s, size, bold)
+    });
+    c.draw(fonts, &state, |_| pic);
     size_out(c, width, height);
     c.px.as_ptr()
 }

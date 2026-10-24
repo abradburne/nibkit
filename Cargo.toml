@@ -1,3 +1,8 @@
+[workspace]
+members = ["nibkit-menu-c"]
+# Dependencies resolved to versions that build with each crate's rust-version (1.87).
+resolver = "3"
+
 [package]
 name = "nibkit"
 version = "0.1.0"
@@ -6,9 +11,8 @@ rust-version = "1.87"
 description = "What an app on a nibOS handheld needs to know and do: both screens, vblank, the buttons' names, touch, brightness, volume, where its files go, layered settings"
 # MIT, and the fonts in assets/ (embedded by `menu-raster`) under the SIL OFL 1.1.
 license = "MIT AND OFL-1.1"
-# Placeholders until the repository is public: the user fills these in before publishing.
-repository = "https://github.com/abradburne/nibos"
-homepage = "https://github.com/abradburne/nibos/tree/main/sdk/nibkit"
+repository = "https://github.com/abradburne/nibkit"
+homepage = "https://github.com/abradburne/nibkit"
 documentation = "https://docs.rs/nibkit"
 readme = "README.md"
 keywords = ["handheld", "nibos", "dual-screen", "rg-ds", "sdl2"]
@@ -24,7 +28,7 @@ include = [
     "examples/*.rs",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE",
+    "LICENSE-MIT",
 ]
 
 # The system the app runs on, chosen when it is built: `nibos` (the default), `stock` (the RG

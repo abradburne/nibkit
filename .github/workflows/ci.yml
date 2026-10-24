@@ -1,0 +1,85 @@
+# nibkit's checks: formatting, clippy for each system, the tests on a desktop, the oldest
+# supported Rust, an aarch64 Linux build (the handheld's), and the sign-off on pull requests.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: SDL2, for the example
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
+      - run: cargo fmt --all --check
+      - name: clippy, nibOS
+        run: cargo clippy --all-targets --features dslot,menu-raster,net-control -- -D warnings
+      - name: clippy, a desktop
+        run: cargo clippy --all-targets --features desktop,dslot,menu-raster -- -D warnings
+      - name: clippy, the stock OS
+        run: cargo clippy --all-targets --no-default-features --features stock,dslot,menu-raster -- -D warnings
+      - name: clippy, nibkit-menu-c
+        run: cargo clippy -p nibkit-menu-c --all-targets -- -D warnings
+      - name: tests, a desktop
+        run: cargo test --features desktop,dslot,menu-raster
+      - name: tests, nibOS
+        run: cargo test --features dslot,menu-raster,net-control
+      - name: tests, nibkit-menu-c
+        run: cargo test -p nibkit-menu-c
+
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.87
+      - name: The library, every system (not the SDL example)
+        run: |
+          cargo check --locked --lib --features dslot,menu-raster,net-control
+          cargo check --lib --features desktop,dslot,menu-raster
+          cargo check --lib --no-default-features --features stock,dslot,menu-raster
+          cargo check -p nibkit-menu-c --lib
+
+  aarch64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+      - name: The library, as the handheld builds it
+        run: |
+          cargo check --lib --target aarch64-unknown-linux-gnu --features dslot,menu-raster,net-control
+          cargo check -p nibkit-menu-c --lib --target aarch64-unknown-linux-gnu
+
+  dco:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Every commit is signed off
+        run: |
+          base=${{ github.event.pull_request.base.sha }}
+          head=${{ github.event.pull_request.head.sha }}
+          missing=0
+          for c in $(git rev-list --no-merges "$base..$head"); do
+            if ! git log -1 --format=%B "$c" | grep -q '^Signed-off-by: '; then
+              echo "::error::$(git log -1 --format='%h %s' "$c"): no Signed-off-by (git commit -s)"
+              missing=1
+            fi
+          done
+          exit $missing

@@ -8,8 +8,8 @@
 //! finger, and the keyboard stands in for the buttons (`nibkit::input::keyboard`: X is A, the
 //! arrows the D-pad, Escape (Back) quits).
 //!
-//! On the device, run it with nothing else on the screens (`sdk/run.sh` stops DSlot and starts
-//! it again afterwards). D-pad up / down: the top screen's brightness. A: change the colour,
+//! On the device, run it with nothing else on the screens (nibOS's `sdk/run.sh` stops DSlot and
+//! starts it again afterwards). D-pad up / down: the top screen's brightness. A: change the colour,
 //! which is remembered. A finger on the bottom screen: a dot. Select + Start: quit.
 
 use nibkit::input::{keyboard, printed, Face};

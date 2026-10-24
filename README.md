@@ -3,8 +3,9 @@
 What an app on a nibOS handheld (the Anbernic RG DS+ today) needs to know and do: where its two
 screens are, the buttons by what is printed on them, touch, each screen's brightness, the
 volume, where its files go, and settings at three levels. A Rust library, MIT, with no graphics
-library of its own: use it with SDL, as [`examples/hello.rs`](examples/hello.rs) and
-[`../template`](../template) do, or anything else.
+library of its own: use it with SDL, as [`examples/hello.rs`](examples/hello.rs) and nibOS's
+app template do, or anything else. It was written for nibOS, a Linux system of its own for
+small handhelds, and is used by its boot UI (DSlot), its emulators and its own tools.
 
 The same app builds for **nibOS** (feature `nibos`, the default), the RG DS+'s **stock OS**
 (feature `stock`) or a **desktop** computer (feature `desktop`; chosen on its own on macOS and
@@ -32,6 +33,13 @@ nibkit = "0.1"                                                         # nibOS; 
 | `menu-raster` | `menu`, drawn into an RGBA picture in Roboto Condensed (embedded, SIL OFL 1.1: `assets/OFL.txt`). |
 
 Rust 1.87 or later.
+
+## The crates
+
+| Crate | |
+|---|---|
+| `nibkit` (this directory) | The Rust library. |
+| [`nibkit-menu-c`](nibkit-menu-c/README.md) | nibkit for C and C++ apps: the menu, the Connections page, DSlot's settings and an emulator's options, as a static library and `include/nibkit_menu.h`. |
 
 ## On a desktop
 
@@ -81,8 +89,8 @@ cargo run --example battery                                       # nibOS: the b
 cargo run --example hello --no-default-features --features stock  # built for the stock OS
 ```
 
-On the device, run it with the screens free: `sdk/run.sh` stops DSlot first and starts it again
-after.
+On the device, run it with the screens free: nibOS's `sdk/run.sh` stops DSlot first and starts it
+again after.
 
 ## Settings
 
@@ -127,8 +135,22 @@ cargo test --features dslot,menu-raster                                 # nibOS 
 cargo test --features desktop,dslot,menu-raster                         # a desktop
 cargo test --no-default-features --features stock,dslot,menu-raster     # the stock OS
 cargo clippy --all-targets --features dslot,menu-raster -- -D warnings
+cargo test -p nibkit-menu-c                                            # the C library
 ```
 
 Every test runs on a desktop, Linux or macOS: none needs the handheld.
 
 The example needs SDL2 (`sdl2-compat` on nibOS; Homebrew's `sdl2` on a Mac).
+
+## Licence
+
+nibkit and nibkit-menu-c are under the MIT licence ([LICENSE-MIT](LICENSE-MIT)). The Roboto
+Condensed fonts in `assets/`, which `menu-raster` and nibkit-menu-c embed, are under the SIL
+Open Font License 1.1 ([assets/OFL.txt](assets/OFL.txt), [assets/README](assets/README)): a
+program or package built with either ships that `OFL.txt` with it.
+
+## Contributing
+
+Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Every commit is
+signed off under the [Developer Certificate of Origin](https://developercertificate.org/)
+(`git commit -s`).

@@ -1,5 +1,8 @@
 # Changelog
 
+nibkit and nibkit-menu-c, which are released together. Until 0.1.0 they lived in nibOS's
+repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their history starts.
+
 ## 0.1.0 (unreleased)
 
 - `dslot`: `[games]` in a description names a file listing the only games it plays of a

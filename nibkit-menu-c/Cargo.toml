@@ -6,7 +6,13 @@ rust-version = "1.87"
 description = "nibkit for C and C++ apps: DSlot's menu for the touch screen, DSlot's settings and an emulator's declared options, brightness, clock, battery and volume: a static library and include/nibkit_menu.h"
 # MIT, and nibkit's fonts, which the library embeds, under the SIL OFL 1.1 (OFL.txt).
 license = "MIT AND OFL-1.1"
-repository = "https://github.com/abradburne/nibos"
+repository = "https://github.com/abradburne/nibkit"
+homepage = "https://github.com/abradburne/nibkit"
+documentation = "https://docs.rs/nibkit-menu-c"
+readme = "README.md"
+keywords = ["handheld", "nibos", "ffi", "menu", "dual-screen"]
+categories = ["game-development", "external-ffi-bindings"]
+include = ["src/**/*.rs", "include/*.h", "README.md", "OFL.txt", "LICENSE-MIT"]
 
 [lib]
 name = "nibkit_menu"
@@ -19,7 +25,6 @@ nibos = ["nibkit/nibos", "nibkit/net-control"]
 stock = ["nibkit/stock"]
 
 [dependencies]
-nibkit = { path = "../nibkit", default-features = false, features = ["menu-raster", "dslot"] }
+nibkit = { path = "..", version = "0.1", default-features = false, features = ["menu-raster", "dslot"] }
 libc = "0.2"
 
-[workspace]

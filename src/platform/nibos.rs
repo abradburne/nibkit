@@ -3,6 +3,8 @@
 
 use crate::input::Face;
 use crate::screens::Layout;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 pub const NAME: &str = "nibOS";
 /// As apps name it in `runs_on`.
@@ -53,6 +55,60 @@ pub const ROM_ROOTS: &[&str] = &[
     "/mnt/ds/Games",
 ];
 pub const SAVES_ROOT: &str = "/mnt/roms/Saves";
+
+/// The card in TF2: its mount point, and the slot's mmc host (the DS+'s sdmmc1 is `mmc1`), a
+/// `mmc1:XXXX` folder under which says the kernel has a card, before udev and the mount catch
+/// up. Its fstab entry is `noauto`; a udev rule starts the mount when the card appears
+/// (rootfs/dslot/70-nibos-games-card.rules), and systemd drops it when the card goes.
+const GAMES_CARD: (&str, &str) = ("/mnt/ds", "/sys/class/mmc_host/mmc1");
+
+/// `ROM_ROOTS`, less the TF2 card's when there is no card in the slot. A path under an
+/// unmounted mount point is an empty folder at best, and when `/mnt/ds` was an automount each
+/// touch of it waited the device timeout (5 s) out with the slot empty, again and again.
+pub fn rom_roots() -> Vec<PathBuf> {
+    let (mount, host) = GAMES_CARD;
+    let card = mounted(Path::new(mount)) || card_in(Path::new(host));
+    ROM_ROOTS
+        .iter()
+        .map(PathBuf::from)
+        .filter(|r| card || !r.starts_with(mount))
+        .collect()
+}
+
+/// Waits, up to `timeout`, for the TF2 card's mount while a card is in the slot and not mounted
+/// yet (udev and systemd mount it moments after the kernel sees it, which at power-on may be
+/// after a launcher has started). Returns at once with no card in, or a card already mounted.
+pub fn wait_for_cards(timeout: Duration) {
+    let (mount, host) = (Path::new(GAMES_CARD.0), Path::new(GAMES_CARD.1));
+    let start = Instant::now();
+    while start.elapsed() < timeout && card_in(host) && !mounted(mount) {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+/// Whether a file system is mounted at `dir`. An automount's autofs counts: its first use
+/// mounts the file system.
+fn mounted(dir: &Path) -> bool {
+    std::fs::read_to_string("/proc/self/mounts")
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|l| l.split(' ').nth(1))
+        .any(|m| Path::new(m) == dir)
+}
+
+/// Whether the kernel has a card on the mmc host at `host`: a `mmcN:XXXX` folder under it.
+fn card_in(host: &Path) -> bool {
+    let Some(name) = host.file_name().and_then(|n| n.to_str()) else {
+        return false;
+    };
+    let prefix = format!("{name}:");
+    std::fs::read_dir(host)
+        .ok()
+        .into_iter()
+        .flatten()
+        .flatten()
+        .any(|e| e.file_name().to_string_lossy().starts_with(&prefix))
+}
 
 /// The backlights as nibos-hw names them: links to the kernel's backlight devices.
 pub const BACKLIGHTS: Option<(&str, &str)> =

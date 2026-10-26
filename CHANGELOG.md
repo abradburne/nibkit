@@ -3,7 +3,18 @@
 nibkit and nibkit-menu-c, which are released together. Until 0.1.0 they lived in nibOS's
 repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their history starts.
 
-## 0.1.0 (unreleased)
+## 0.1.1
+
+- `paths::rom_roots` (nibOS) leaves the TF2 card's folders out when there is no card in the
+  slot: a path under an unmounted mount point is an empty folder at best, and under the
+  automount nibOS used to have, each touch of it waited the device timeout out (5 s) with the
+  slot empty, so a shelf took minutes to fill. nibOS now mounts the card from udev when it
+  appears.
+- `paths::wait_for_cards(timeout)`: waits for a card the kernel has seen but udev hasn't
+  mounted yet, for a launcher listing games at power-on; returns at once otherwise (and on
+  the stock OS and desktops).
+
+## 0.1.0
 
 - `dslot`: `[games]` in a description names a file listing the only games it plays of a
   system (name, title, model, year, series, tab-separated): `Emulator::takes`,

@@ -17,10 +17,14 @@ mod desktop;
 pub use desktop::*;
 
 /// The games' `Roms` folders, on a system whose are fixed places.
-#[cfg(not(nibkit_desktop))]
+#[cfg(nibkit_stock)]
 pub fn rom_roots() -> Vec<std::path::PathBuf> {
     ROM_ROOTS.iter().map(std::path::PathBuf::from).collect()
 }
+
+/// Nothing to wait for: the cards are mounted before anything runs, or there are none.
+#[cfg(not(nibkit_nibos))]
+pub fn wait_for_cards(_timeout: std::time::Duration) {}
 
 /// Where saves go, on a system whose is a fixed place.
 #[cfg(not(nibkit_desktop))]

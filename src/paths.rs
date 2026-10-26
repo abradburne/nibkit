@@ -125,6 +125,14 @@ pub fn slot_copy(rom: &Path, roots: &[PathBuf]) -> bool {
         .any(|r| r.join(system).join(file).is_file())
 }
 
+/// Waits, up to `timeout`, for a card that is in a slot but not mounted yet (on nibOS the TF2
+/// card, mounted by udev moments after the kernel sees it). Returns at once when there is
+/// nothing to wait for. For a launcher listing games at power-on, before it reads
+/// [`rom_roots`]'s folders.
+pub fn wait_for_cards(timeout: std::time::Duration) {
+    platform::wait_for_cards(timeout)
+}
+
 /// Where games' saves go, a folder per console and one per game in it: `<root>/GBC/<ROM
 /// name>/`. On the ROMS partition, whichever card the game is on.
 pub fn saves_root() -> PathBuf {

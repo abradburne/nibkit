@@ -3,6 +3,29 @@
 nibkit and nibkit-menu-c, which are released together. Until 0.1.0 they lived in nibOS's
 repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their history starts.
 
+## 0.1.3
+
+- `menu::indicators` (feature `menu-raster`): RetroAchievements' progress and challenge
+  indicators, the same in every app. `Indicators` keeps them while rcheevos says they are up
+  (`progress(id, Notice)`, `hide_progress`, `challenge(id, Notice)`, `end_challenge`, `clear`,
+  `badge(name, ..)`): the progress a panel in the toast's style headed "Progress"; each
+  challenge a panel of its own headed "Challenge" in gold, its badge at 56 units in a gold ring
+  that pulses slowly (1.8 s); a challenge for the achievement whose progress is shown one panel,
+  not two, the progress under its title. Stacked at the bottom left, opposite the toasts: the
+  progress at the top, the challenges under it, the newest last, the oldest challenges left out
+  first when they don't fit; one awaiting its badge waits for it up to `BADGE_WAIT`. `tick(now)`
+  once a frame says when the picture changes; `draw(fonts, frame)` gives a `Stack` (one picture
+  and its place), its panels drawn only when what they say or the frame changes, the rings
+  painted again `PULSE_RATE` (16) times a second (about 0.1 ms; the panels 1.4 ms, a Mac).
+- `menu::toast`: `Kind::Progress` and `Kind::Challenge` (`Said`/`Notice::progress(title,
+  measured)`, `::challenge(title)`, headed `PROGRESS` and `CHALLENGE`); `Toast::badge_rect`;
+  `pulse(rgba, size, badge, scale, strength)`, a gold ring painted into a drawn panel's pixels,
+  and `pulse_strength(since)`; `stack(frame, scale, sizes, pinned)`, where indicator panels go.
+  A badge is never drawn under `BADGE_LEAST` (56 units): a toast of two lines is 2 units taller,
+  its lines centred beside it. nibkit-menu-c: `NIB_TOAST_PROGRESS`, `NIB_TOAST_CHALLENGE`,
+  `nib_toast_progress`, `_challenge`, `_badge_rect`, `_pulse`, `_pulse_strength`, `_stack`, and
+  `nib_indicators_*`; `NIBKIT_MENU_VERSION` 103.
+
 ## 0.1.2
 
 - `menu::toast` (feature `menu-raster`): the toast over a game that is playing, in DSlot's

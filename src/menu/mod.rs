@@ -20,6 +20,9 @@
 //! - [`toast`] (feature `menu-raster`) draws a toast over a game that is playing (an
 //!   achievement unlocked, a problem) and queues them, so they look and come and go the same
 //!   in every app.
+//! - [`indicators`] (feature `menu-raster`) keeps RetroAchievements' progress and challenge
+//!   indicators on screen while they last, as panels in the toast's style stacked at the bottom
+//!   left, a challenge's badge in a pulsing gold ring.
 //! - [`scale_for`] says what scale a frame of any size is drawn at.
 //!
 //! ```
@@ -39,6 +42,8 @@
 #[cfg(feature = "net-control")]
 pub mod connections;
 pub mod glyphs;
+#[cfg(feature = "menu-raster")]
+pub mod indicators;
 mod input;
 pub mod keyboard;
 pub mod keys;

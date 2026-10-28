@@ -14,6 +14,11 @@
 //!
 //! [`draw`] draws one toast from a borrowed [`Said`], for an app that times its own.
 //!
+//! RetroAchievements' indicators, on screen while they last rather than in turn, are panels in
+//! the same style ([`Kind::Progress`], [`Kind::Challenge`]): [`super::indicators`] keeps them
+//! and lays them in their corner ([`stack`]), a challenge's badge ringed in gold that pulses
+//! ([`pulse`]).
+//!
 //! ```
 //! use nibkit::menu::raster::{Canvas, Fonts};
 //! use nibkit::menu::toast::{self, Kind, Notice, Queue};
@@ -52,6 +57,12 @@ pub enum Kind {
     Unlock,
     /// Something went wrong: red.
     Problem,
+    /// An achievement's measured progress ("42/100"), on screen while RetroAchievements says:
+    /// headed [`PROGRESS`], dim.
+    Progress,
+    /// An achievement that can be earned right now (finish without being hit), on screen while
+    /// RetroAchievements says: headed [`CHALLENGE`] in gold, its badge ringed ([`pulse`]).
+    Challenge,
 }
 
 impl Kind {
@@ -60,29 +71,47 @@ impl Kind {
     pub const fn shows(self) -> Duration {
         match self {
             Kind::Unlock => Duration::from_millis(4000),
-            Kind::Info | Kind::Problem => Duration::from_millis(2500),
+            Kind::Info | Kind::Problem | Kind::Progress | Kind::Challenge => {
+                Duration::from_millis(2500)
+            }
         }
     }
 
     /// The heading's colour.
     fn colour(self) -> Rgb {
         match self {
-            Kind::Unlock => colour::GOLD,
+            Kind::Unlock | Kind::Challenge => colour::GOLD,
             Kind::Problem => colour::RED,
-            Kind::Info => colour::DIM,
+            Kind::Info | Kind::Progress => colour::DIM,
         }
     }
 }
 
 /// An unlock's heading, the same in every app.
 pub const UNLOCKED: &str = "Achievement unlocked";
+/// A progress indicator's heading.
+pub const PROGRESS: &str = "Progress";
+/// A challenge indicator's heading.
+pub const CHALLENGE: &str = "Challenge";
 
 /// The longest an unlock waits at the head of the queue for its badge
 /// ([`Notice::awaits_badge`]) before it shows without it.
 pub const BADGE_WAIT: Duration = Duration::from_millis(1500);
 
-/// How far in from the screen's bottom right corner a toast sits, in units.
+/// How far in from the screen's bottom right corner a toast sits, in units; the indicators sit
+/// as far in from the bottom left ([`stack`]).
 pub const MARGIN: f32 = 16.0;
+
+/// Between indicator panels stacked in their corner ([`stack`]), in units.
+pub const STACK_GAP: f32 = 8.0;
+
+/// The smallest a badge is drawn, in units: a toast of fewer lines is as tall as it needs to be
+/// for this, its lines centred beside it. A challenge's badge is this size.
+pub const BADGE_LEAST: f32 = 56.0;
+
+/// One beat of a challenge's ring ([`pulse_strength`]): slow, so it reads as live without
+/// pulling the eye from the game.
+pub const PULSE: Duration = Duration::from_millis(1800);
 
 /// A picture borrowed for a toast's left: RGBA bytes with straight alpha, rows top first, its
 /// width and height.
@@ -126,6 +155,19 @@ impl<'a> Said<'a> {
             .points(points)
     }
 
+    /// An achievement's measured progress: headed [`PROGRESS`], its `title`, and `measured`
+    /// ("42/100") under it.
+    pub fn progress(title: &'a str, measured: &'a str) -> Said<'a> {
+        Said::new(Kind::Progress, title)
+            .header(PROGRESS)
+            .detail(measured)
+    }
+
+    /// An achievement that can be earned right now: headed [`CHALLENGE`] in gold, its `title`.
+    pub fn challenge(title: &'a str) -> Said<'a> {
+        Said::new(Kind::Challenge, title).header(CHALLENGE)
+    }
+
     /// The heading over the title.
     pub fn header(mut self, header: &'a str) -> Said<'a> {
         self.header = header;
@@ -155,14 +197,14 @@ impl<'a> Said<'a> {
 /// [`Notice::unlock`]) and the setters; [`Notice::said`] borrows it for [`draw`].
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Notice {
-    kind: Kind,
+    pub(super) kind: Kind,
     header: String,
     title: String,
-    detail: String,
+    pub(super) detail: String,
     points: u32,
-    badge: Option<(Vec<u8>, usize, usize)>,
+    pub(super) badge: Option<(Vec<u8>, usize, usize)>,
     /// The badge on its way, by name.
-    awaits: Option<String>,
+    pub(super) awaits: Option<String>,
     shows: Duration,
 }
 
@@ -184,6 +226,19 @@ impl Notice {
             .header(UNLOCKED)
             .detail(detail)
             .points(points)
+    }
+
+    /// An achievement's measured progress: headed [`PROGRESS`], its `title`, and `measured`
+    /// ("42/100") under it.
+    pub fn progress(title: impl Into<String>, measured: impl Into<String>) -> Notice {
+        Notice::new(Kind::Progress, title)
+            .header(PROGRESS)
+            .detail(measured)
+    }
+
+    /// An achievement that can be earned right now: headed [`CHALLENGE`] in gold, its `title`.
+    pub fn challenge(title: impl Into<String>) -> Notice {
+        Notice::new(Kind::Challenge, title).header(CHALLENGE)
     }
 
     /// The heading over the title.
@@ -379,32 +434,42 @@ impl Queue {
 
 /// A toast drawn: RGBA with straight alpha (clear corners, the panel a little see-through), rows
 /// top first, its own size.
-pub struct Toast(Canvas);
+pub struct Toast {
+    canvas: Canvas,
+    /// The badge's square in pixels (left, top, width, height), when it has one.
+    badge: Option<(usize, usize, usize, usize)>,
+}
 
 impl Toast {
     /// Its width, in pixels.
     pub fn width(&self) -> usize {
-        self.0.w
+        self.canvas.w
     }
 
     /// Its height, in pixels.
     pub fn height(&self) -> usize {
-        self.0.h
+        self.canvas.h
     }
 
     /// The pixels to a unit it was drawn at.
     pub fn scale(&self) -> f32 {
-        self.0.scale
+        self.canvas.scale
     }
 
     /// Its pixels: 4 bytes each, red, green, blue and alpha (straight).
     pub fn rgba(&self) -> &[u8] {
-        &self.0.px
+        &self.canvas.px
     }
 
     /// Its top left on a `frame` (width, height) drawn at its scale: [`place`].
     pub fn place(&self, frame: (usize, usize)) -> (usize, usize) {
-        place(frame, self.0.scale, (self.0.w, self.0.h))
+        place(frame, self.canvas.scale, (self.canvas.w, self.canvas.h))
+    }
+
+    /// The square its badge is drawn in, in its pixels: left, top, width and height; `None`
+    /// without a badge. Where [`pulse`] rings it.
+    pub fn badge_rect(&self) -> Option<(usize, usize, usize, usize)> {
+        self.badge
     }
 }
 
@@ -472,7 +537,13 @@ pub fn draw(f: &Fonts, said: &Said, scale: f32) -> Toast {
     .filter(|&(line, s)| line == Line::Title || !s.is_empty())
     .collect();
     let text_h = lines.iter().map(|(l, _)| l.style().1).sum::<f32>() - LEADING;
-    let side = if said.badge.is_some() { text_h } else { 0.0 };
+    let side = if said.badge.is_some() {
+        text_h.max(BADGE_LEAST)
+    } else {
+        0.0
+    };
+    // The lines centred beside a badge taller than they are.
+    let inside_h = text_h.max(side);
     let left = PAD
         + if said.badge.is_some() {
             side + GAP
@@ -492,7 +563,7 @@ pub fn draw(f: &Fonts, said: &Said, scale: f32) -> Toast {
         })
         .fold(0.0f32, f32::max);
     let w = (left + want + PAD + INK).clamp(LEAST, MOST).ceil();
-    let h = (PAD * 2.0 + text_h).ceil();
+    let h = (PAD * 2.0 + inside_h).ceil();
     let room = w - left - PAD;
 
     let mut c = Canvas::blank(
@@ -501,7 +572,15 @@ pub fn draw(f: &Fonts, said: &Said, scale: f32) -> Toast {
         scale,
     );
     panel(&mut c, w, h);
+    let mut badge = None;
     if said.badge.is_some() {
+        // In pixels as Canvas::picture fills it: its ends truncated.
+        let (x0, y0) = ((PAD * scale) as usize, (PAD * scale) as usize);
+        let (x1, y1) = (
+            ((PAD + side) * scale) as usize,
+            ((PAD + side) * scale) as usize,
+        );
+        badge = Some((x0, y0, x1 - x0, y1 - y0));
         let place = Draw::Picture {
             index: 0,
             x: PAD,
@@ -512,7 +591,7 @@ pub fn draw(f: &Fonts, said: &Said, scale: f32) -> Toast {
         };
         c.draw(f, std::slice::from_ref(&place), |_| said.badge);
     }
-    let mut y = PAD - RISE;
+    let mut y = PAD + (inside_h - text_h) / 2.0 - RISE;
     for &(line, s) in &lines {
         let (size, step, bold) = line.style();
         let ink = match line {
@@ -528,14 +607,14 @@ pub fn draw(f: &Fonts, said: &Said, scale: f32) -> Toast {
         }
         y += step;
     }
-    Toast(c)
+    Toast { canvas: c, badge }
 }
 
 /// Lays `toast` over `screen` (a screen-sized canvas, premultiplied RGBA) at its bottom right,
 /// [`MARGIN`] in. The toast's pixels replace the screen's, so the screen is clear there or the
 /// game is drawn under it later.
 pub fn lay(screen: &mut Canvas, toast: &Toast) {
-    let t = &toast.0;
+    let t = &toast.canvas;
     let (x0, y0) = place((screen.w, screen.h), screen.scale, (t.w, t.h));
     for y in 0..t.h.min(screen.h - y0) {
         for x in 0..t.w.min(screen.w - x0) {
@@ -559,6 +638,141 @@ pub fn place(frame: (usize, usize), scale: f32, toast: (usize, usize)) -> (usize
         frame.0.saturating_sub(toast.0 + m),
         frame.1.saturating_sub(toast.1 + m),
     )
+}
+
+/// Where indicator panels go on a `frame`-sized picture drawn at `scale` pixels to a unit: in
+/// one column at its bottom left, [`MARGIN`] in, [`STACK_GAP`] apart, `sizes` (width, height)
+/// from the top down; each one's top left, or `None` for one left out. Every app's indicators
+/// sit there, opposite the toasts, the same way.
+///
+/// What doesn't fit between the frame's top and bottom margins is left out: the first `pinned`
+/// (the progress panel, at the top) are kept first, then the rest from the bottom up (the
+/// newest, last, kept before the oldest), stopping at the first that doesn't fit. A panel wider
+/// than the frame starts at its left edge.
+pub fn stack(
+    frame: (usize, usize),
+    scale: f32,
+    sizes: &[(usize, usize)],
+    pinned: usize,
+) -> Vec<Option<(usize, usize)>> {
+    let scale = super::checked_scale(scale);
+    let m = (MARGIN * scale).round() as usize;
+    let gap = (STACK_GAP * scale).round() as usize;
+    let room = frame.1.saturating_sub(2 * m);
+    let pinned = pinned.min(sizes.len());
+    let mut kept = vec![false; sizes.len()];
+    let (mut used, mut n) = (0, 0);
+    let mut fits = |h: usize| {
+        let need = used + h + if n > 0 { gap } else { 0 };
+        let fit = need <= room;
+        if fit {
+            (used, n) = (need, n + 1);
+        }
+        fit
+    };
+    for i in 0..pinned {
+        kept[i] = fits(sizes[i].1);
+    }
+    for i in (pinned..sizes.len()).rev() {
+        if !fits(sizes[i].1) {
+            break;
+        }
+        kept[i] = true;
+    }
+    // From the bottom up, each above the one under it.
+    let mut out = vec![None; sizes.len()];
+    let mut bottom = frame.1.saturating_sub(m);
+    for i in (0..sizes.len()).rev().filter(|&i| kept[i]) {
+        let (w, h) = sizes[i];
+        let top = bottom.saturating_sub(h);
+        out[i] = Some((m.min(frame.0.saturating_sub(w)), top));
+        bottom = top.saturating_sub(gap);
+    }
+    out
+}
+
+/// How bright a challenge's ring is `since` it started pulsing: from a fifth up to full and back
+/// once every [`PULSE`], smoothly; for [`pulse`].
+pub fn pulse_strength(since: Duration) -> f32 {
+    const LOW: f32 = 0.2;
+    let beat = since.as_secs_f64() / PULSE.as_secs_f64();
+    let wave = (1.0 - (beat.fract() * std::f64::consts::TAU).cos()) / 2.0;
+    LOW + (1.0 - LOW) * wave as f32
+}
+
+/// The ring round a badge, in units: its gap from the badge, its width, and its inner corners'
+/// radius.
+const RING_GAP: f32 = 2.0;
+const RING_WIDTH: f32 = 3.0;
+const RING_RADIUS: f32 = 4.0;
+
+/// Paints a challenge's ring into a copy of a drawn panel's pixels: a gold ([`colour::GOLD`])
+/// rounded frame just outside `badge` ([`Toast::badge_rect`], moved to where the panel is in
+/// `rgba`), at `strength` (0 to 1: [`pulse_strength`]) over what is there. `rgba` is `w` x `h`
+/// pixels, straight alpha, drawn at `scale` pixels to a unit. Cheap (only the ring's pixels are
+/// touched, no text is drawn), so the ring can pulse while the panel is drawn once: start each
+/// step from the panel's own pixels. At strength 0 it changes nothing.
+pub fn pulse(
+    rgba: &mut [u8],
+    (w, h): (usize, usize),
+    badge: (usize, usize, usize, usize),
+    scale: f32,
+    strength: f32,
+) {
+    let strength = if strength.is_nan() {
+        0.0
+    } else {
+        strength.clamp(0.0, 1.0)
+    };
+    if strength <= 0.0 || rgba.len() < w * h * 4 {
+        return;
+    }
+    let s = super::checked_scale(scale);
+    let (bx, by, bw, bh) = (
+        badge.0 as f32,
+        badge.1 as f32,
+        badge.2 as f32,
+        badge.3 as f32,
+    );
+    let (gap, width) = (RING_GAP * s, RING_WIDTH * s);
+    // The badge's square grown by `d` pixels each way.
+    let grow = |d: f32| (bx - d, by - d, bw + 2.0 * d, bh + 2.0 * d);
+    let inner = grow(gap);
+    let outer = grow(gap + width);
+    let (ri, ro) = (RING_RADIUS * s, (RING_RADIUS + RING_WIDTH) * s);
+    let x0 = outer.0.floor().max(0.0) as usize;
+    let y0 = outer.1.floor().max(0.0) as usize;
+    let x1 = ((outer.0 + outer.2).ceil().max(0.0) as usize).min(w);
+    let y1 = ((outer.1 + outer.3).ceil().max(0.0) as usize).min(h);
+    for py in y0..y1 {
+        for px in x0..x1 {
+            let (cx, cy) = (px as f32 + 0.5, py as f32 + 0.5);
+            // Inside the outer frame and outside the inner, by the distance to the nearer edge;
+            // a pixel's share is how far its centre is inside, half a pixel either way.
+            let d = edge(cx, cy, outer, ro).max(-edge(cx, cy, inner, ri));
+            let a = (0.5 - d).clamp(0.0, 1.0) * strength;
+            if a <= 0.0 {
+                continue;
+            }
+            let i = (py * w + px) * 4;
+            over(&mut rgba[i..i + 4], colour::GOLD, a);
+        }
+    }
+}
+
+/// `c` at `a` over the pixel `p` (straight alpha), as compositing does: the pixel takes `c`'s
+/// share of what covers it.
+fn over(p: &mut [u8], c: Rgb, a: f32) {
+    let da = p[3] as f32 / 255.0;
+    let out = a + da * (1.0 - a);
+    if out <= 0.0 {
+        return;
+    }
+    for k in 0..3 {
+        let v = (c[k] as f32 * a + p[k] as f32 * da * (1.0 - a)) / out;
+        p[k] = v.round().clamp(0.0, 255.0) as u8;
+    }
+    p[3] = (out * 255.0).round() as u8;
 }
 
 /// A line's width in units as [`Canvas::text`] draws it at `scale`: at its size in whole pixels.
@@ -625,7 +839,7 @@ mod tests {
             &Said::unlock("First Blood", "Win a battle", 25).badge(&badge, 8, 8),
             1.0,
         );
-        let c = &t.0;
+        let c = &t.canvas;
         assert_eq!(c.h, (PAD * 2.0 + 26.0 + 32.0 + 28.0 - 4.0).ceil() as usize);
         assert!(c.w >= LEAST as usize && c.w as f32 <= MOST);
         // Corners clear, the middle all but opaque, the badge drawn at the left.
@@ -661,8 +875,8 @@ mod tests {
         );
         let (side, y) = (t.height() as f32 - PAD * 2.0, PAD as usize + 4);
         let x = |k: f32| (PAD + side * k) as usize;
-        assert_eq!(rgb(&t.0, x(0.2), y), colour::PANEL);
-        assert_eq!(rgb(&t.0, x(0.8), y), [255, 0, 0]);
+        assert_eq!(rgb(&t.canvas, x(0.2), y), colour::PANEL);
+        assert_eq!(rgb(&t.canvas, x(0.8), y), [255, 0, 0]);
     }
 
     #[test]
@@ -698,7 +912,7 @@ mod tests {
         let long = "Defeat every boss in the castle without taking a single hit, twice over";
         for scale in [0.53, 0.75, 1.0, 1.29, 1.5] {
             let t = draw(&f, &Said::new(Kind::Info, "Title").detail(long), scale);
-            let c = &t.0;
+            let c = &t.canvas;
             let (w, h) = (c.w as f32 / scale, c.h as f32 / scale);
             // Right of the room, inside the edge, between the panel's straight sides.
             let x0 = ((w - PAD) * scale).ceil() as usize + 1;
@@ -898,5 +1112,157 @@ mod tests {
             q.tick(t0).unwrap().serial() > serial,
             "serials never repeat"
         );
+    }
+
+    #[test]
+    fn a_badge_is_never_under_the_least_and_its_square_is_known() {
+        let f = Fonts::new();
+        let badge = [200u8, 90, 40, 255].repeat(8 * 8);
+        // Two lines (54 units) beside a 56-unit badge, centred on it.
+        let t = draw(&f, &Said::challenge("No Damage").badge(&badge, 8, 8), 1.0);
+        assert_eq!(t.height(), (PAD * 2.0 + BADGE_LEAST) as usize);
+        assert_eq!(t.badge_rect(), Some((16, 16, 56, 56)));
+        let (x, y, w, h) = t.badge_rect().unwrap();
+        assert_eq!(rgb(&t.canvas, x + w / 2, y + h / 2), [200, 90, 40]);
+        assert_eq!(rgb(&t.canvas, x + w + 2, y + h / 2), colour::PANEL);
+        // Three lines: as tall as they are. Twice the scale, twice the pixels.
+        let big = draw(
+            &f,
+            &Said::progress("Collector", "42/100").badge(&badge, 8, 8),
+            2.0,
+        );
+        assert_eq!(big.badge_rect(), Some((32, 32, 164, 164)));
+        assert_eq!(
+            draw(&f, &Said::challenge("No Damage"), 1.0).badge_rect(),
+            None
+        );
+    }
+
+    #[test]
+    fn the_indicators_kinds_are_headed_and_coloured() {
+        let p = Said::progress("Collector", "42/100");
+        assert_eq!(
+            (p.kind, p.header, p.detail),
+            (Kind::Progress, PROGRESS, "42/100")
+        );
+        let c = Notice::challenge("No Damage");
+        assert_eq!(
+            (c.said().kind, c.said().header),
+            (Kind::Challenge, CHALLENGE)
+        );
+        assert_eq!(Kind::Challenge.colour(), colour::GOLD);
+        assert_eq!(Kind::Progress.colour(), colour::DIM);
+    }
+
+    #[test]
+    fn a_pulse_at_nothing_changes_nothing() {
+        let f = Fonts::new();
+        let badge = [200u8, 90, 40, 255].repeat(8 * 8);
+        let t = draw(&f, &Said::challenge("No Damage").badge(&badge, 8, 8), 1.0);
+        let mut px = t.rgba().to_vec();
+        let size = (t.width(), t.height());
+        for none in [0.0, -1.0, f32::NAN] {
+            pulse(&mut px, size, t.badge_rect().unwrap(), 1.0, none);
+            assert_eq!(px, t.rgba());
+        }
+        // Too few pixels for the size: left alone.
+        pulse(&mut px[..8], size, t.badge_rect().unwrap(), 1.0, 1.0);
+    }
+
+    #[test]
+    fn the_ring_is_gold_round_the_badge_at_full_strength() {
+        let f = Fonts::new();
+        let badge = [200u8, 90, 40, 255].repeat(8 * 8);
+        for scale in [1.0, 1.5] {
+            let t = draw(&f, &Said::challenge("No Damage").badge(&badge, 8, 8), scale);
+            let (x, y, w, h) = t.badge_rect().unwrap();
+            let mut px = t.rgba().to_vec();
+            let size = (t.width(), t.height());
+            pulse(&mut px, size, (x, y, w, h), scale, 1.0);
+            let at = |px: &[u8], x: usize, y: usize| {
+                let i = (y * size.0 + x) * 4;
+                [px[i], px[i + 1], px[i + 2], px[i + 3]]
+            };
+            // In the middle of the ring's width, left, right, above and below: gold, opaque.
+            let mid = ((RING_GAP + RING_WIDTH / 2.0) * scale) as usize + 1;
+            let gold = [colour::GOLD[0], colour::GOLD[1], colour::GOLD[2], 255];
+            for (rx, ry) in [
+                (x - mid, y + h / 2),
+                (x + w + mid - 1, y + h / 2),
+                (x + w / 2, y - mid),
+                (x + w / 2, y + h + mid - 1),
+            ] {
+                assert_eq!(at(&px, rx, ry), gold, "({rx}, {ry}) at {scale}");
+            }
+            // The badge and the panel past the ring untouched.
+            assert_eq!(
+                at(&px, x + w / 2, y + h / 2),
+                at(t.rgba(), x + w / 2, y + h / 2)
+            );
+            let past = ((RING_GAP + RING_WIDTH + 1.5) * scale) as usize;
+            assert_eq!(
+                at(&px, x + w + past, y + h / 2),
+                at(t.rgba(), x + w + past, y + h / 2)
+            );
+            // Half strength: half way from the panel to gold.
+            let mut half = t.rgba().to_vec();
+            pulse(&mut half, size, (x, y, w, h), scale, 0.5);
+            let p = at(&half, x - mid, y + h / 2);
+            let panel = at(t.rgba(), x - mid, y + h / 2);
+            assert!(p[0] > panel[0] && p[0] < colour::GOLD[0]);
+        }
+    }
+
+    #[test]
+    fn the_pulse_is_slow_and_smooth() {
+        assert!((pulse_strength(Duration::ZERO) - 0.2).abs() < 1e-6);
+        assert!((pulse_strength(PULSE / 2) - 1.0).abs() < 1e-6);
+        assert!((pulse_strength(PULSE) - 0.2).abs() < 1e-4);
+        let quarter = pulse_strength(PULSE / 4);
+        assert!(quarter > 0.5 && quarter < 0.7, "{quarter}");
+    }
+
+    #[test]
+    fn indicators_stack_at_the_bottom_left() {
+        // Three panels: the top one first, the newest at the bottom, the margin in.
+        let at = stack((1024, 768), 1.0, &[(300, 114), (280, 88), (290, 88)], 1);
+        let bottom = 768 - 16 - 88;
+        let middle = bottom - 8 - 88;
+        assert_eq!(
+            at,
+            [
+                Some((16, middle - 8 - 114)),
+                Some((16, middle)),
+                Some((16, bottom))
+            ]
+        );
+        // Twice the scale: twice the margin and gap.
+        let at = stack((2048, 1536), 2.0, &[(600, 176), (560, 176)], 0);
+        assert_eq!(
+            at,
+            [
+                Some((32, 1536 - 32 - 176 - 16 - 176)),
+                Some((32, 1536 - 32 - 176))
+            ]
+        );
+        // Too many for the screen: the pinned top one kept, then the newest; the oldest under
+        // the top one left out.
+        let sizes = [(300, 200), (300, 200), (300, 200), (300, 200)];
+        let at = stack((1024, 640), 1.0, &sizes, 1);
+        let bottom = 640 - 16 - 200;
+        assert_eq!(
+            at,
+            [Some((16, bottom - 8 - 200)), None, None, Some((16, bottom))]
+        );
+        // Without one pinned, the oldest goes first.
+        let at = stack((1024, 640), 1.0, &sizes, 0);
+        assert_eq!(at.iter().filter(|a| a.is_some()).count(), 2);
+        assert_eq!(at[0], None);
+        // Wider than the frame: from its left edge; nothing: nothing.
+        assert_eq!(
+            stack((200, 768), 1.0, &[(300, 50)], 0),
+            [Some((0, 768 - 16 - 50))]
+        );
+        assert!(stack((1024, 768), 1.0, &[], 0).is_empty());
     }
 }

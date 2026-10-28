@@ -31,8 +31,8 @@
 extern "C" {
 #endif
 
-/* This header's version: major * 10000 + minor * 100 + patch (0.1.2). */
-#define NIBKIT_MENU_VERSION 102
+/* This header's version: major * 10000 + minor * 100 + patch (0.1.3). */
+#define NIBKIT_MENU_VERSION 103
 
 /* The library's version, as NIBKIT_MENU_VERSION in the header it was built with: a program
  * that uses a function added after the oldest library it supports checks it at run time. */
@@ -300,6 +300,8 @@ enum {
     NIB_TOAST_INFO = 0,    /* the heading dim */
     NIB_TOAST_UNLOCK = 1,  /* the heading gold: an achievement */
     NIB_TOAST_PROBLEM = 2, /* the heading red */
+    NIB_TOAST_PROGRESS = 3,  /* an indicator: the heading dim (0.1.3) */
+    NIB_TOAST_CHALLENGE = 4, /* an indicator: the heading gold (0.1.3) */
 };
 
 NibToast *nib_toast_new(void);
@@ -310,6 +312,11 @@ void nib_toast_begin(NibToast *t, int kind, const char *title);
 /* Starts an achievement unlocked: headed "Achievement unlocked" in gold, its title, detail (NULL
  * for none) and points. */
 void nib_toast_unlock(NibToast *t, const char *title, const char *detail, int points);
+/* Starts a progress indicator: headed "Progress", its title, `measured` ("42/100") under it.
+ * (0.1.3) */
+void nib_toast_progress(NibToast *t, const char *title, const char *measured);
+/* Starts a challenge indicator: headed "Challenge" in gold, its title. (0.1.3) */
+void nib_toast_challenge(NibToast *t, const char *title);
 void nib_toast_header(NibToast *t, const char *header);
 void nib_toast_detail(NibToast *t, const char *detail);
 /* An unlock's points, at the title's right ("1 point", "25 points"); 0 for none. */
@@ -320,9 +327,28 @@ void nib_toast_badge(NibToast *t, const uint8_t *rgba, int width, int height);
 void nib_toast_await_badge(NibToast *t, const char *name);
 /* How long it shows in a queue, instead of its kind's time. */
 void nib_toast_shows(NibToast *t, int ms);
-/* The toast drawn for a `frame_w` x `frame_h` frame; valid until the next call on `t`. */
+/* The toast drawn for a `frame_w` x `frame_h` frame; valid until the next call on `t`. A badge
+ * is never under 56 units (the lines centred beside it). */
 const uint8_t *nib_toast_render(NibToast *t, int frame_w, int frame_h, int *width, int *height,
                                 int *x, int *y);
+/* The badge's square in the last picture nib_toast_render gave, in its pixels: 1, or 0 (the outs
+ * untouched) without a badge. (0.1.3) */
+int nib_toast_badge_rect(const NibToast *t, int *x, int *y, int *width, int *height);
+/* A challenge's ring: paints a gold rounded frame just outside the badge's square (x, y, w, h,
+ * moved to where the panel is in `rgba`) into `rgba`, `width` x `height` pixels with straight
+ * alpha drawn at `scale` (nib_menu_scale_for), at `strength` (0-1, nib_toast_pulse_strength)
+ * over what is there. No text drawn: cheap enough to call on a copy of the panel's pixels at
+ * each step of the pulse, on any thread. At 0 it changes nothing. (0.1.3) */
+void nib_toast_pulse(uint8_t *rgba, int width, int height, int x, int y, int w, int h,
+                     float scale, float strength);
+/* The ring's strength `ms` after it started: a fifth to full and back every 1.8 s. (0.1.3) */
+float nib_toast_pulse_strength(uint64_t ms);
+/* Where indicator panels go on a `frame_w` x `frame_h` frame: one column at the bottom left, the
+ * toasts' margin in, `n` panels from the top down, `sizes` (width, height pairs) in, each one's
+ * top left out in `places` (x, y pairs; -1, -1 for one left out). What doesn't fit is left out:
+ * the first `pinned` (the progress panel) kept first, then from the bottom up (the newest kept
+ * before the oldest). Returns how many were placed. (0.1.3) */
+int nib_toast_stack(int frame_w, int frame_h, int n, const int *sizes, int pinned, int *places);
 
 NibToasts *nib_toasts_new(void);
 void nib_toasts_free(NibToasts *q);
@@ -341,6 +367,68 @@ const uint8_t *nib_toasts_render(NibToasts *q, int frame_w, int frame_h, int *wi
                                  int *height, int *x, int *y);
 /* Drops every toast, the one on show too. */
 void nib_toasts_clear(NibToasts *q);
+
+/* ---- RetroAchievements' indicators (0.1.3) ---------------------------------------------------
+ *
+ * On screen while they last, rather than queued: the progress of the achievement being
+ * measured (one at a time, updated in place, until rcheevos takes it down), and the challenges
+ * under way, each a panel of its own headed "Challenge" with its badge (56 units) in a gold ring
+ * that pulses slowly, and its title. A challenge for the achievement whose progress is shown is
+ * one panel, headed "Challenge", the progress under its title. Stacked at the bottom left (the
+ * toasts are bottom right): the progress at the top, the challenges under it, the newest last;
+ * those that don't fit are left out, the oldest challenges first. One awaiting its badge waits
+ * for it up to 1.5 s, as an unlock does.
+ *
+ *     NibIndicators *ind = nib_indicators_new();
+ *     // rcheevos says:
+ *     nib_toast_progress(t, "Collector", "42/100");
+ *     nib_toast_await_badge(t, "12345");             // or nib_toast_badge
+ *     nib_indicators_progress(ind, id, t);           // copied
+ *     nib_toast_challenge(t, "No Damage");
+ *     nib_toast_badge(t, rgba, 64, 64);
+ *     nib_indicators_challenge(ind, id2, t);
+ *     nib_indicators_badge(ind, "12345", rgba, 64, 64);
+ *     // once a frame:
+ *     uint64_t shown = nib_indicators_tick(ind, now_ms);
+ *     if (shown != last) {                           // what they say, or the ring's next step
+ *         int w, h, x, y;
+ *         const uint8_t *px = nib_indicators_render(ind, frame_w, frame_h, &w, &h, &x, &y);
+ *         // px NULL: none; else lay it over the frame at (x, y) until it changes
+ *         last = shown;
+ *     }
+ *
+ * While a ring pulses (nib_indicators_pulsing), the number changes 16 times a second; the panels
+ * are drawn (text rasterised, a few milliseconds) only when what they say or the frame's size
+ * changes, and the ring alone painted again otherwise. Keep a render whose tick changed off a
+ * real-time thread, as a toast's. `now_ms` is any clock in milliseconds that only goes
+ * forward. */
+typedef struct NibIndicators NibIndicators;
+
+NibIndicators *nib_indicators_new(void);
+void nib_indicators_free(NibIndicators *i);
+/* Achievement `id`'s progress, as `t` says it (nib_toast_progress and its badge): up, or updated
+ * in place. Copied. */
+void nib_indicators_progress(NibIndicators *i, uint32_t id, const NibToast *t);
+void nib_indicators_hide_progress(NibIndicators *i);
+/* Achievement `id`'s challenge, as `t` says it (nib_toast_challenge and its badge): up after
+ * those up, or updated in place. Copied. */
+void nib_indicators_challenge(NibIndicators *i, uint32_t id, const NibToast *t);
+void nib_indicators_end_challenge(NibIndicators *i, uint32_t id);
+/* Every indicator down (the game changed, the machine was reset). */
+void nib_indicators_clear(NibIndicators *i);
+/* A badge arrives, copied: every indicator awaiting `name` has it. */
+void nib_indicators_badge(NibIndicators *i, const char *name, const uint8_t *rgba, int width,
+                          int height);
+/* What is on show at `now_ms`: 0 for nothing, else a number that changes whenever the picture
+ * does. */
+uint64_t nib_indicators_tick(NibIndicators *i, uint64_t now_ms);
+/* 1 while a challenge's ring pulses. */
+int nib_indicators_pulsing(const NibIndicators *i);
+/* The indicators as the last tick found them, stacked in one picture for a `frame_w` x `frame_h`
+ * frame (RGBA, straight alpha, clear between the panels), and where on it it goes; NULL for
+ * none. Valid until the next call on `i`. */
+const uint8_t *nib_indicators_render(NibIndicators *i, int frame_w, int frame_h, int *width,
+                                     int *height, int *x, int *y);
 
 #ifdef __cplusplus
 }

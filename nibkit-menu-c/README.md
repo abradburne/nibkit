@@ -16,8 +16,9 @@ written in C++ (DSperate) shows the same menu as DSlot and inkdot through it:
   `_points`, `_badge`, `_render`; and `nib_toasts_*`, the queue that shows them one at a time
   for their kind's time, an unlock waiting a moment for its badge.
 - **RetroAchievements' indicators:** `nib_indicators_*`, the progress and challenges up while
-  rcheevos says, stacked at the bottom left in the toasts' style, a challenge's badge in a
-  pulsing gold ring (`nib_toast_progress`, `nib_toast_challenge` say what each panel says);
+  rcheevos says, at the bottom left: the progress a panel in the toasts' style, each challenge
+  its badge alone, see-through, in a pulsing gold ring (`nib_toast_progress`,
+  `nib_toast_challenge` say what each is);
   `nib_toast_badge_rect`, `_pulse`, `_stack` for an app that lays its own.
 - **Versions:** `NIBKIT_MENU_VERSION` in the header, `nib_menu_version()` in the library.
 - **What the pages show:** DSlot's settings file and the emulator's options as its description

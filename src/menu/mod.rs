@@ -21,8 +21,8 @@
 //!   achievement unlocked, a problem) and queues them, so they look and come and go the same
 //!   in every app.
 //! - [`indicators`] (feature `menu-raster`) keeps RetroAchievements' progress and challenge
-//!   indicators on screen while they last, as panels in the toast's style stacked at the bottom
-//!   left, a challenge's badge in a pulsing gold ring.
+//!   indicators on screen while they last at the bottom left: the progress a panel in the
+//!   toast's style, each challenge its badge alone in a pulsing gold ring.
 //! - [`scale_for`] says what scale a frame of any size is drawn at.
 //!
 //! ```

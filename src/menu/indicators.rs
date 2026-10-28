@@ -5,20 +5,23 @@
 //!   taken down when rcheevos says: a panel in the toast's style headed "Progress", the badge,
 //!   the title and the progress under it.
 //! - **Challenges:** achievements that can be earned right now (finish without being hit), each
-//!   shown until rcheevos takes it down, several at once: a panel of its own headed "Challenge",
-//!   the badge at its full size ([`toast::BADGE_LEAST`]) in a gold ring that pulses slowly
-//!   ([`toast::pulse`]), and the title. A challenge for the achievement whose progress is shown
-//!   is one panel, not two: headed "Challenge", ringed, with the progress under its title.
+//!   shown until rcheevos takes it down, several at once: each just its badge, an icon
+//!   [`ICON`] units square with rounded corners, in a gold ring that pulses slowly
+//!   ([`toast::pulse_strength`]: the ring is what says it is live), the whole icon
+//!   [`ICON_OPACITY`] opaque so the game shows through. No heading, no title: they are small so
+//!   as not to be in the way. A challenge for the achievement whose progress is shown is not an
+//!   icon of its own: it is shown in the progress panel, headed "Challenge", its badge ringed.
 //!
-//! They stack at the screen's bottom left, opposite the toasts ([`toast::stack`]): the progress
-//! at the top, the challenges under it, the newest last; those that don't fit on the screen are
-//! left out, the oldest challenges first. A panel whose badge is on its way waits for it up to
-//! [`toast::BADGE_WAIT`], as an unlock does.
+//! They sit at the screen's bottom left, opposite the toasts ([`toast::stack`]): the progress
+//! panel at the top, the challenges' icons in a row under it, the newest at the right; icons
+//! that don't fit across the screen are left out, the oldest first. A panel or icon whose badge
+//! is on its way waits for it up to [`toast::BADGE_WAIT`], as an unlock does, and then shows
+//! without it (an icon as a dark square in its ring).
 //!
 //! An app keeps one [`Indicators`], tells it what rcheevos says, asks [`Indicators::tick`] once
 //! a frame whether the picture changed, and lays [`Indicators::draw`]'s [`Stack`] over its
-//! frame. The panels are drawn (text rasterised: a few milliseconds) only when what they say or
-//! the frame's size changes; in between, only the rings are painted again, at
+//! frame. The panel and icons are drawn (text rasterised: a few milliseconds) only when what
+//! they say or the frame's size changes; in between, only the rings are painted again, at
 //! [`PULSE_RATE`] steps a second, which is cheap: an app on a real-time thread need take it off
 //! only around a draw whose tick changed. nibkit-menu-c's `nib_indicators_*` is the same for C
 //! and C++.
@@ -39,7 +42,7 @@
 //! assert_ne!(shown, 0);
 //! let stack = up.draw(&fonts, (1024, 768)).unwrap();
 //! assert_eq!(stack.place().0, 16);
-//! // The ring moves on a step later: the same panels, painted again.
+//! // The ring moves on a step later: the same panel and icon, painted again.
 //! assert_ne!(up.tick(now + Duration::from_millis(100)), shown);
 //! ```
 
@@ -51,6 +54,23 @@ use std::time::{Duration, Instant};
 /// How many times a second a challenge's ring is painted again while it pulses: smooth enough
 /// for a slow pulse, and a quarter of the frames a 60 Hz app would otherwise hand on.
 pub const PULSE_RATE: u32 = 16;
+
+/// A challenge's icon: its badge's side, in units (a toast's badge's least,
+/// [`toast::BADGE_LEAST`]); the ring is outside it.
+pub const ICON: f32 = toast::BADGE_LEAST;
+
+/// How opaque a challenge's icon is, its badge and ring together (0 to 1): enough to read, the
+/// game showing through.
+pub const ICON_OPACITY: f32 = 0.8;
+
+/// How round an icon's corners are, in units: as the menu's keys and buttons.
+const ICON_RADIUS: f32 = 10.0;
+
+/// Between icons' rings in their row, in units.
+const ICON_GAP: f32 = 6.0;
+
+/// An icon's picture, ring and all, in units: the badge and the ring each side.
+const ICON_BOX: f32 = ICON + 2.0 * (toast::RING_GAP + toast::RING_WIDTH);
 
 /// One step of the ring.
 const STEP: Duration = Duration::from_nanos(1_000_000_000 / PULSE_RATE as u64);
@@ -99,9 +119,18 @@ struct Drawn {
     panels: Vec<Panel>,
     frame: (usize, usize),
     plain: Vec<u8>,
-    rings: Vec<(usize, usize, usize, usize)>,
+    rings: Vec<Ring>,
     step: Option<u64>,
     stack: Stack,
+}
+
+/// A ring to paint: the badge's square in the stack, its corners' radius in units, and how
+/// opaque it is at full strength.
+#[derive(Clone, Copy, Debug)]
+struct Ring {
+    badge: (usize, usize, usize, usize),
+    corner: f32,
+    opacity: f32,
 }
 
 /// RetroAchievements' indicators an app has up: see the module's documentation.
@@ -251,13 +280,14 @@ impl Indicators {
                 let since = Duration::from_nanos((STEP.as_nanos() as u64).saturating_mul(step));
                 let strength = toast::pulse_strength(since);
                 let size = (d.stack.canvas.w, d.stack.canvas.h);
-                for &ring in &d.rings {
-                    toast::pulse(
+                for r in &d.rings {
+                    toast::ring(
                         &mut d.stack.canvas.px,
                         size,
-                        ring,
+                        r.badge,
                         d.stack.canvas.scale,
-                        strength,
+                        strength * r.opacity,
+                        r.corner,
                     );
                 }
             }
@@ -309,10 +339,14 @@ impl Indicators {
         }
     }
 
-    /// Whether a panel's badge is ringed: a challenge's, when it has one to ring.
+    /// Whether it has a ring: every challenge's icon, and the progress panel shared with a
+    /// challenge when it has a badge to ring.
     fn ringed(&self, panel: Panel) -> bool {
-        matches!(panel, Panel::Both(_) | Panel::Challenge(_))
-            && self.notice(panel).is_some_and(|n| n.badge.is_some())
+        match panel {
+            Panel::Challenge(_) => true,
+            Panel::Both(_) => self.notice(panel).is_some_and(|n| n.badge.is_some()),
+            Panel::Progress => false,
+        }
     }
 
     /// `notice` with the badge achievement `id` already has (an update to its progress, or
@@ -334,45 +368,86 @@ impl Indicators {
         }
     }
 
-    /// Draws the panels for `frame` and stacks them.
+    /// Draws the panel and the icons for `frame` and lays them in their corner.
     fn draw_panels(&self, fonts: &Fonts, seen: &Seen, frame: (usize, usize)) -> Option<Drawn> {
         let scale = scale_for(frame.0, frame.1);
-        let drawn: Vec<(toast::Toast, bool)> = seen
+        // The progress panel, shared with its challenge or not.
+        let top = seen
             .panels
             .iter()
-            .filter_map(|&p| {
+            .filter(|p| matches!(p, Panel::Progress | Panel::Both(_)))
+            .find_map(|&p| {
                 let n = self.notice(p)?;
                 let ringed = n.kind == Kind::Challenge && n.badge.is_some();
                 Some((toast::draw(fonts, &n.said(), scale), ringed))
+            });
+        // The challenges' icons, newest last: as many as fit across, the newest kept.
+        let side = (ICON_BOX * scale).round() as usize;
+        let gap = (ICON_GAP * scale).round() as usize;
+        let m = (toast::MARGIN * scale).round() as usize;
+        let across = (frame.0.saturating_sub(2 * m) + gap) / (side + gap).max(1);
+        let badges: Vec<Option<toast::Badge>> = seen
+            .panels
+            .iter()
+            .filter_map(|&p| match p {
+                Panel::Challenge(id) => self.challenges.iter().find(|c| c.id == id),
+                _ => None,
+            })
+            .map(|c| {
+                c.notice
+                    .badge
+                    .as_ref()
+                    .map(|(px, w, h)| (px.as_slice(), *w, *h))
             })
             .collect();
-        let sizes: Vec<(usize, usize)> =
-            drawn.iter().map(|(t, _)| (t.width(), t.height())).collect();
-        let pinned = usize::from(matches!(
-            seen.panels.first(),
-            Some(Panel::Progress | Panel::Both(_))
-        ));
-        let at = toast::stack(frame, scale, &sizes, pinned);
-        let kept: Vec<(&toast::Toast, bool, (usize, usize))> = drawn
-            .iter()
-            .zip(&at)
-            .filter_map(|((t, r), a)| a.map(|a| (t, *r, a)))
-            .collect();
-        let x0 = kept.iter().map(|(_, _, a)| a.0).min()?;
-        let y0 = kept.iter().map(|(_, _, a)| a.1).min()?;
-        let x1 = kept.iter().map(|(t, _, a)| a.0 + t.width()).max()?;
-        let y1 = kept.iter().map(|(t, _, a)| a.1 + t.height()).max()?;
+        let badges = &badges[badges.len().saturating_sub(across)..];
+        let row_w = (badges.len() * (side + gap)).saturating_sub(gap);
+        let mut sizes = Vec::new();
+        if let Some((t, _)) = &top {
+            sizes.push((t.width(), t.height()));
+        }
+        if !badges.is_empty() {
+            sizes.push((row_w, side));
+        }
+        let at = toast::stack(frame, scale, &sizes, usize::from(top.is_some()));
+        let (top_at, row_at) = match &top {
+            Some(_) => (at.first().copied().flatten(), at.get(1).copied().flatten()),
+            None => (None, at.first().copied().flatten()),
+        };
+        let mut boxes: Vec<(usize, usize, usize, usize)> = Vec::new();
+        if let (Some((t, _)), Some((x, y))) = (&top, top_at) {
+            boxes.push((x, y, t.width(), t.height()));
+        }
+        if let Some((x, y)) = row_at.filter(|_| !badges.is_empty()) {
+            boxes.push((x, y, row_w, side));
+        }
+        let x0 = boxes.iter().map(|b| b.0).min()?;
+        let y0 = boxes.iter().map(|b| b.1).min()?;
+        let x1 = boxes.iter().map(|b| b.0 + b.2).max()?;
+        let y1 = boxes.iter().map(|b| b.1 + b.3).max()?;
         let mut canvas = Canvas::blank(x1 - x0, y1 - y0, scale);
         let mut rings = Vec::new();
-        for (t, ringed, (x, y)) in kept {
+        if let (Some((t, ringed)), Some((x, y))) = (&top, top_at) {
             let (ox, oy) = (x - x0, y - y0);
-            for row in 0..t.height() {
-                let s = row * t.width() * 4;
-                let d = ((oy + row) * canvas.w + ox) * 4;
-                canvas.px[d..d + t.width() * 4].copy_from_slice(&t.rgba()[s..s + t.width() * 4]);
+            put(&mut canvas, t.rgba(), (t.width(), t.height()), (ox, oy));
+            if let (true, Some((bx, by, bw, bh))) = (*ringed, t.badge_rect()) {
+                rings.push(Ring {
+                    badge: (ox + bx, oy + by, bw, bh),
+                    corner: toast::RING_RADIUS - toast::RING_GAP,
+                    opacity: 1.0,
+                });
             }
-            if let (true, Some((bx, by, bw, bh))) = (ringed, t.badge_rect()) {
-                rings.push((ox + bx, oy + by, bw, bh));
+        }
+        if let Some((x, y)) = row_at {
+            for (i, &badge) in badges.iter().enumerate() {
+                let (ox, oy) = (x - x0 + i * (side + gap), y - y0);
+                let (px, inner) = icon(fonts, badge, scale, side);
+                put(&mut canvas, &px, (side, side), (ox, oy));
+                rings.push(Ring {
+                    badge: (ox + inner.0, oy + inner.1, inner.2, inner.3),
+                    corner: ICON_RADIUS,
+                    opacity: ICON_OPACITY,
+                });
             }
         }
         Some(Drawn {
@@ -388,6 +463,53 @@ impl Indicators {
             },
         })
     }
+}
+
+/// `px` (`size` pixels) copied into `canvas` with its top left at `at`.
+fn put(canvas: &mut Canvas, px: &[u8], (w, h): (usize, usize), (x, y): (usize, usize)) {
+    for row in 0..h {
+        let d = ((y + row) * canvas.w + x) * 4;
+        canvas.px[d..d + w * 4].copy_from_slice(&px[row * w * 4..(row + 1) * w * 4]);
+    }
+}
+
+/// A challenge's icon, `side` pixels square at `scale`: its badge (or a dark square while it
+/// has none) with rounded corners in the middle, room for the ring round it, the whole
+/// [`ICON_OPACITY`] opaque. Its pixels, and the badge's square in them.
+fn icon(
+    fonts: &Fonts,
+    badge: Option<toast::Badge>,
+    scale: f32,
+    side: usize,
+) -> (Vec<u8>, (usize, usize, usize, usize)) {
+    let mut c = Canvas::blank(side, side, scale);
+    let pad = toast::RING_GAP + toast::RING_WIDTH;
+    let at = (pad, pad, ICON, ICON);
+    match badge {
+        Some(b) => {
+            let place = super::Draw::Picture {
+                index: 0,
+                x: pad,
+                y: pad,
+                w: ICON,
+                h: ICON,
+                faded: false,
+            };
+            c.draw(fonts, std::slice::from_ref(&place), |_| Some(b));
+        }
+        None => {
+            for p in c.px.chunks_exact_mut(4) {
+                p[..3].copy_from_slice(&super::colour::PANEL);
+            }
+        }
+    }
+    // Its shape in the alpha: the rounded square, ICON_OPACITY at most.
+    let shape = |x, y| super::raster::edge(x, y, at, ICON_RADIUS);
+    c.cover(at, shape, |p, a| {
+        p[3] = (a * ICON_OPACITY * 255.0).round() as u8
+    });
+    let (x0, x1) = ((pad * scale) as usize, ((pad + ICON) * scale) as usize);
+    (c.px, (x0, x0, x1 - x0, x1 - x0))
 }
 
 /// The indicators drawn: the panels stacked in one picture, RGBA with straight alpha (clear
@@ -467,8 +589,11 @@ mod tests {
         assert!(up.is_empty() && !up.pulsing());
     }
 
+    /// An icon's side in pixels at scale 1: the badge and its ring.
+    const BOX: usize = 66;
+
     #[test]
-    fn progress_on_top_challenges_under_it_newest_last_bottom_left() {
+    fn progress_on_top_challenge_icons_in_a_row_under_it_bottom_left() {
         let f = Fonts::new();
         let mut up = Indicators::new();
         let t0 = Instant::now();
@@ -484,28 +609,84 @@ mod tests {
             [Panel::Progress, Panel::Challenge(2), Panel::Challenge(3)]
         );
         let s = up.draw(&f, (1024, 768)).unwrap();
-        // Bottom left, the margin in, three panels tall with gaps between them.
         let progress = toast::draw(
             &f,
             &Said::progress("Collector", "42/100").badge(&badge(10), 16, 16),
             1.0,
         );
-        let challenge = toast::draw(
-            &f,
-            &Said::challenge("No Damage").badge(&badge(20), 16, 16),
-            1.0,
-        );
+        // Bottom left, the margin in: the panel as it is, a row of two icons under it.
+        assert_eq!(ICON_BOX as usize, BOX);
         assert_eq!(s.place().0, 16);
         assert_eq!(s.place().1 + s.height(), 768 - 16);
-        assert_eq!(
-            s.height(),
-            progress.height() + 2 * challenge.height() + 2 * 8
-        );
-        // The progress panel's top row is the picture's, its pixels as drawn alone.
+        assert_eq!(s.height(), progress.height() + 8 + BOX);
         let row = &s.rgba()[..progress.width() * 4];
         assert_eq!(row, &progress.rgba()[..progress.width() * 4]);
-        // A clear gap under it.
-        assert_eq!(alpha(s, 20, progress.height() + 4), 0);
+        assert_eq!(alpha(s, 20, progress.height() + 4), 0, "a clear gap");
+        // The icons' badges, oldest left, newest right, ICON_GAP apart.
+        let y = progress.height() + 8 + BOX / 2;
+        let px = |x: usize| &s.rgba()[(y * s.width() + x) * 4..][..4];
+        let most = (ICON_OPACITY * 255.0).round() as u8;
+        assert_eq!(px(BOX / 2), [20, 20, 20, most]);
+        assert_eq!(px(BOX + 6 + BOX / 2), [30, 30, 30, most]);
+        // Nothing past the second icon but the panel above.
+        assert_eq!(alpha(s, 2 * BOX + 6 + 2, y), 0);
+    }
+
+    #[test]
+    fn an_icon_is_its_badge_rounded_and_see_through() {
+        let f = Fonts::new();
+        let (px, inner) = icon(&f, Some((&badge(200), 16, 16)), 1.0, BOX);
+        assert_eq!(inner, (5, 5, 56, 56));
+        let at = |x: usize, y: usize| &px[(y * BOX + x) * 4..][..4];
+        let most = (ICON_OPACITY * 255.0).round() as u8;
+        // The badge, ICON_OPACITY opaque; its rounded corner and the ring's room clear.
+        assert_eq!(at(33, 33), [200, 200, 200, most]);
+        assert_eq!(at(5, 5)[3], 0, "the corner is rounded off");
+        assert_eq!(at(2, 33)[3], 0);
+        assert!(px.chunks_exact(4).all(|p| p[3] <= most));
+        // Without a badge: a dark square in its place.
+        let (px, _) = icon(&f, None, 1.0, BOX);
+        assert_eq!(px[(33 * BOX + 33) * 4..][..3], colour::PANEL);
+        // Twice the scale, twice the pixels.
+        let (_, inner) = icon(&f, None, 2.0, 2 * BOX);
+        assert_eq!(inner, (10, 10, 112, 112));
+    }
+
+    #[test]
+    fn the_icons_ring_is_gold_and_as_see_through_as_the_icon() {
+        let f = Fonts::new();
+        let mut up = Indicators::new();
+        let t0 = Instant::now();
+        up.challenge(2, Notice::challenge("No Damage").badge(badge(5), 16, 16));
+        up.tick(t0);
+        // At the top of the pulse.
+        up.tick(t0 + PULSE / 2);
+        let s = up.draw(&f, (1024, 768)).unwrap();
+        assert_eq!((s.width(), s.height()), (BOX, BOX));
+        let at = |x: usize, y: usize| &s.rgba()[(y * BOX + x) * 4..][..4];
+        let most = (ICON_OPACITY * 255.0).round() as u8;
+        // In the middle of the ring's width, left of the badge: gold, ICON_OPACITY opaque.
+        let ring = at(1, BOX / 2);
+        assert_eq!(ring[..3], colour::GOLD);
+        assert!(ring[3].abs_diff(most) <= 1, "{}", ring[3]);
+        assert!(s.rgba().chunks_exact(4).all(|p| p[3] <= most + 1));
+    }
+
+    #[test]
+    fn the_row_keeps_the_newest_when_it_is_too_long() {
+        let f = Fonts::new();
+        let mut up = Indicators::new();
+        // Across 1024 less the margins, 13 icons and their gaps fit; 15 are up.
+        for id in 1..=15 {
+            let v = id as u8 * 10;
+            up.challenge(id, Notice::challenge("C").badge(badge(v), 16, 16));
+        }
+        up.tick(Instant::now());
+        let s = up.draw(&f, (1024, 768)).unwrap();
+        assert_eq!(s.width(), 13 * BOX + 12 * 6);
+        let px = |i: usize| s.rgba()[((BOX / 2) * s.width() + i * (BOX + 6) + BOX / 2) * 4];
+        // The two oldest left out; the newest at the right.
+        assert_eq!([px(0), px(12)], [30, 150]);
     }
 
     #[test]
@@ -534,12 +715,8 @@ mod tests {
         assert!(up.ringed(Panel::Both(7)));
         let s = up.draw(&f, (1024, 768)).unwrap();
         let want = toast::draw(&f, &said, 1.0);
-        let other = toast::draw(
-            &f,
-            &Said::challenge("No Damage").badge(&badge(20), 16, 16),
-            1.0,
-        );
-        assert_eq!(s.height(), want.height() + 8 + other.height());
+        assert_eq!(s.height(), want.height() + 8 + BOX);
+        assert_eq!(up.drawn.as_ref().unwrap().rings.len(), 2, "both ringed");
         // The challenge over, the progress is its own panel again.
         up.end_challenge(7);
         up.tick(Instant::now());
@@ -556,13 +733,13 @@ mod tests {
         up.challenge(2, Notice::challenge("No Damage").awaits_badge("222"));
         assert_eq!(up.tick(t0), 0);
         assert_eq!(up.tick(t0 + BADGE_WAIT - Duration::from_millis(1)), 0);
-        // Shown without it after the wait, unringed.
-        assert_ne!(up.tick(t0 + BADGE_WAIT), 0);
-        assert!(!up.pulsing());
-        // It comes: ringed.
-        up.badge("222", badge(5), 16, 16);
-        assert_ne!(up.tick(t0 + BADGE_WAIT), 0);
+        // Shown without it after the wait, a dark square in its ring.
+        let before = up.tick(t0 + BADGE_WAIT);
+        assert_ne!(before, 0);
         assert!(up.pulsing());
+        // It comes: drawn again.
+        up.badge("222", badge(5), 16, 16);
+        assert_ne!(up.tick(t0 + BADGE_WAIT), before);
         // One that comes in time shows at once.
         let mut up = Indicators::new();
         up.challenge(2, Notice::challenge("No Damage").awaits_badge("222"));
@@ -638,11 +815,11 @@ mod tests {
     }
 
     #[test]
-    fn laid_over_a_screen_where_its_panels_are() {
+    fn laid_over_a_screen_where_its_icons_are() {
         let f = Fonts::new();
         let mut up = Indicators::new();
-        up.challenge(2, Notice::challenge("No Damage").badge(badge(5), 16, 16));
-        up.challenge(3, Notice::challenge("Speedy").badge(badge(9), 16, 16));
+        up.challenge(2, Notice::challenge("No Damage").badge(badge(200), 16, 16));
+        up.challenge(3, Notice::challenge("Speedy").badge(badge(90), 16, 16));
         up.tick(Instant::now());
         let s = up.draw(&f, (1024, 768)).unwrap();
         let mut screen = Canvas::new(1.0);
@@ -652,12 +829,11 @@ mod tests {
         s.lay(&mut screen);
         let (x, y) = s.place();
         let at = |x: usize, y: usize| &screen.px[(y * screen.w + x) * 4..][..4];
-        // The panel's middle; its clear corner and the screen beside the stack untouched.
-        assert_eq!(
-            at(x + s.width() / 2, y + 4)[..3],
-            colour::PANEL.map(|c| ((c as u32 * 240 + 127) / 255) as u8)
-        );
-        assert_eq!(at(x, y), [1, 2, 3, 255]);
+        // An icon's middle, premultiplied; between and beside them the screen untouched.
+        let most = (ICON_OPACITY * 255.0).round() as u32;
+        let v = ((200 * most + 127) / 255) as u8;
+        assert_eq!(at(x + BOX / 2, y + BOX / 2), [v, v, v, most as u8]);
+        assert_eq!(at(x + BOX + 3, y + BOX / 2), [1, 2, 3, 255]);
         assert_eq!(at(x + s.width() + 1, y + 20), [1, 2, 3, 255]);
     }
 }

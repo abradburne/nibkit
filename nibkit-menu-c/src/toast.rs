@@ -8,8 +8,8 @@
 //! its own (`nib_toast_render`), or handed to a `NibToasts` queue (`nib_toasts_push`), which
 //! shows one at a time, in turn, each for its kind's time, an unlock waiting a moment for its
 //! badge; or to `NibIndicators` (`nib_indicators_progress`, `_challenge`), RetroAchievements'
-//! indicators, nibkit's `menu::indicators`: up while they last, stacked at the bottom left, a
-//! challenge's badge in a pulsing gold ring.
+//! indicators, nibkit's `menu::indicators`: up while they last at the bottom left, the
+//! progress a panel, each challenge its badge alone in a pulsing gold ring.
 
 use nibkit::menu::indicators::Indicators;
 use nibkit::menu::raster::Fonts;
@@ -26,7 +26,8 @@ pub const UNLOCK: c_int = 1;
 pub const PROBLEM: c_int = 2;
 /// An achievement's measured progress: headed "Progress".
 pub const PROGRESS: c_int = 3;
-/// An achievement that can be earned right now: headed "Challenge" in gold.
+/// An achievement that can be earned right now: an icon in the indicators; headed "Challenge"
+/// in gold where it shares the progress panel.
 pub const CHALLENGE: c_int = 4;
 
 /// A toast being filled, behind the C header's opaque `NibToast`: what it says, the fonts
@@ -135,7 +136,7 @@ fn instant(clock: &mut Option<(u64, Instant)>, now_ms: u64) -> Instant {
 
 /// The version of the library: major × 10000 + minor × 100 + patch, as `NIBKIT_MENU_VERSION`
 /// in the header it was built with.
-pub const VERSION: c_int = 103;
+pub const VERSION: c_int = 104;
 
 #[no_mangle]
 pub extern "C" fn nib_menu_version() -> c_int {

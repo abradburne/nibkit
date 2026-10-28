@@ -15,8 +15,9 @@
 //! [`draw`] draws one toast from a borrowed [`Said`], for an app that times its own.
 //!
 //! RetroAchievements' indicators, on screen while they last rather than in turn, are panels in
-//! the same style ([`Kind::Progress`], [`Kind::Challenge`]): [`super::indicators`] keeps them
-//! and lays them in their corner ([`stack`]), a challenge's badge ringed in gold that pulses
+//! the same style ([`Kind::Progress`], and [`Kind::Challenge`] where a challenge shares the
+//! progress panel): [`super::indicators`] keeps them and lays them in their corner ([`stack`]),
+//! a challenge's badge (alone, as an icon) ringed in gold that pulses
 //! ([`pulse`]).
 //!
 //! ```
@@ -61,7 +62,9 @@ pub enum Kind {
     /// headed [`PROGRESS`], dim.
     Progress,
     /// An achievement that can be earned right now (finish without being hit), on screen while
-    /// RetroAchievements says: headed [`CHALLENGE`] in gold, its badge ringed ([`pulse`]).
+    /// RetroAchievements says: headed [`CHALLENGE`] in gold, its badge ringed ([`pulse`]). The
+    /// indicators draw a challenge as its badge alone, and as a panel only where it shares the
+    /// progress panel.
     Challenge,
 }
 
@@ -702,9 +705,9 @@ pub fn pulse_strength(since: Duration) -> f32 {
 
 /// The ring round a badge, in units: its gap from the badge, its width, and its inner corners'
 /// radius.
-const RING_GAP: f32 = 2.0;
-const RING_WIDTH: f32 = 3.0;
-const RING_RADIUS: f32 = 4.0;
+pub(super) const RING_GAP: f32 = 2.0;
+pub(super) const RING_WIDTH: f32 = 3.0;
+pub(super) const RING_RADIUS: f32 = 4.0;
 
 /// Paints a challenge's ring into a copy of a drawn panel's pixels: a gold ([`colour::GOLD`])
 /// rounded frame just outside `badge` ([`Toast::badge_rect`], moved to where the panel is in
@@ -714,10 +717,25 @@ const RING_RADIUS: f32 = 4.0;
 /// step from the panel's own pixels. At strength 0 it changes nothing.
 pub fn pulse(
     rgba: &mut [u8],
+    size: (usize, usize),
+    badge: (usize, usize, usize, usize),
+    scale: f32,
+    strength: f32,
+) {
+    // A square badge's ring: its inner corners as round as the gap makes a badge's of
+    // RING_RADIUS - RING_GAP units.
+    ring(rgba, size, badge, scale, strength, RING_RADIUS - RING_GAP);
+}
+
+/// [`pulse`]'s ring round a badge whose corners are rounded by `corner` units: the ring's
+/// corners follow them, the gap even all round.
+pub(super) fn ring(
+    rgba: &mut [u8],
     (w, h): (usize, usize),
     badge: (usize, usize, usize, usize),
     scale: f32,
     strength: f32,
+    corner: f32,
 ) {
     let strength = if strength.is_nan() {
         0.0
@@ -739,7 +757,8 @@ pub fn pulse(
     let grow = |d: f32| (bx - d, by - d, bw + 2.0 * d, bh + 2.0 * d);
     let inner = grow(gap);
     let outer = grow(gap + width);
-    let (ri, ro) = (RING_RADIUS * s, (RING_RADIUS + RING_WIDTH) * s);
+    let ri = (corner.max(0.0) + RING_GAP) * s;
+    let ro = ri + width;
     let x0 = outer.0.floor().max(0.0) as usize;
     let y0 = outer.1.floor().max(0.0) as usize;
     let x1 = ((outer.0 + outer.2).ceil().max(0.0) as usize).min(w);

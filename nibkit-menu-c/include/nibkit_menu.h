@@ -31,8 +31,8 @@
 extern "C" {
 #endif
 
-/* This header's version: major * 10000 + minor * 100 + patch (0.1.3). */
-#define NIBKIT_MENU_VERSION 103
+/* This header's version: major * 10000 + minor * 100 + patch (0.1.4). */
+#define NIBKIT_MENU_VERSION 104
 
 /* The library's version, as NIBKIT_MENU_VERSION in the header it was built with: a program
  * that uses a function added after the oldest library it supports checks it at run time. */
@@ -315,7 +315,9 @@ void nib_toast_unlock(NibToast *t, const char *title, const char *detail, int po
 /* Starts a progress indicator: headed "Progress", its title, `measured` ("42/100") under it.
  * (0.1.3) */
 void nib_toast_progress(NibToast *t, const char *title, const char *measured);
-/* Starts a challenge indicator: headed "Challenge" in gold, its title. (0.1.3) */
+/* Starts a challenge indicator: its title and (nib_toast_badge) badge. NibIndicators shows a
+ * challenge as its badge alone; the title and the "Challenge" heading in gold are drawn only
+ * when it shares the progress panel. (0.1.3) */
 void nib_toast_challenge(NibToast *t, const char *title);
 void nib_toast_header(NibToast *t, const char *header);
 void nib_toast_detail(NibToast *t, const char *detail);
@@ -371,13 +373,14 @@ void nib_toasts_clear(NibToasts *q);
 /* ---- RetroAchievements' indicators (0.1.3) ---------------------------------------------------
  *
  * On screen while they last, rather than queued: the progress of the achievement being
- * measured (one at a time, updated in place, until rcheevos takes it down), and the challenges
- * under way, each a panel of its own headed "Challenge" with its badge (56 units) in a gold ring
- * that pulses slowly, and its title. A challenge for the achievement whose progress is shown is
- * one panel, headed "Challenge", the progress under its title. Stacked at the bottom left (the
- * toasts are bottom right): the progress at the top, the challenges under it, the newest last;
- * those that don't fit are left out, the oldest challenges first. One awaiting its badge waits
- * for it up to 1.5 s, as an unlock does.
+ * measured (one at a time, updated in place, until rcheevos takes it down) as a panel, and the
+ * challenges under way as icons: each just its badge (56 units, rounded corners) in a gold ring
+ * that pulses slowly, the whole icon 80% opaque (0.1.4; in 0.1.3 a panel each). A challenge for
+ * the achievement whose progress is shown is no icon: the progress panel shows it, headed
+ * "Challenge", its badge ringed. Bottom left (the toasts are bottom right): the progress panel
+ * at the top, the icons in a row under it, the newest at the right; icons that don't fit across
+ * are left out, the oldest first. One awaiting its badge waits for it up to 1.5 s, as an unlock
+ * does (an icon then shows a dark square until it comes).
  *
  *     NibIndicators *ind = nib_indicators_new();
  *     // rcheevos says:

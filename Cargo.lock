@@ -442,7 +442,7 @@ dependencies = [
 
 [[package]]
 name = "nibkit"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "fontdue",
  "libc",
@@ -454,7 +454,7 @@ dependencies = [
 
 [[package]]
 name = "nibkit-menu-c"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "libc",
  "nibkit",

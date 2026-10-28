@@ -3,6 +3,16 @@
 nibkit and nibkit-menu-c, which are released together. Until 0.1.0 they lived in nibOS's
 repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their history starts.
 
+## 0.1.4
+
+- `menu::indicators`: a challenge is now just its badge, not a panel: an icon `ICON` (56) units
+  square with rounded corners, in the gold ring that pulses, the whole icon `ICON_OPACITY`
+  (0.8) opaque so it is less in the way; no heading, no title. The icons sit in a row under the
+  progress panel, the newest at the right, those that don't fit across left out, the oldest
+  first; one whose badge doesn't come shows a dark square in its ring. A challenge for the
+  achievement in progress is still shown in the progress panel, headed "Challenge", ringed. The
+  progress panel is as it was. nibkit-menu-c: `NIBKIT_MENU_VERSION` 104, the same calls.
+
 ## 0.1.3
 
 - `menu::indicators` (feature `menu-raster`): RetroAchievements' progress and challenge

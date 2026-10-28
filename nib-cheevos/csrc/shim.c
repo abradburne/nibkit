@@ -322,6 +322,19 @@ int nib_rc_hash_file(char out[33], uint32_t console_id, const char* path, nib_rc
   return hash_with(out, console_id, &it, log, verbose, ud);
 }
 
+int nib_rc_hash_disc(char out[33], uint32_t console_id, const char* path,
+                     const nib_rc_cdreader* reader, nib_rc_log_fn log, int verbose, void* ud) {
+  rc_hash_iterator_t it;
+  if (!path || !reader) return 0;
+  rc_hash_initialize_iterator(&it, path, NULL, 0);
+  it.callbacks.cdreader.open_track = reader->open_track;
+  it.callbacks.cdreader.read_sector = reader->read_sector;
+  it.callbacks.cdreader.close_track = reader->close_track;
+  it.callbacks.cdreader.first_track_sector = reader->first_track_sector;
+  it.callbacks.cdreader.open_track_iterator = NULL;
+  return hash_with(out, console_id, &it, log, verbose, ud);
+}
+
 int nib_rc_hash_buffer(char out[33], uint32_t console_id, const char* name, const uint8_t* data,
                        size_t size, nib_rc_log_fn log, int verbose, void* ud) {
   rc_hash_iterator_t it;

@@ -1,7 +1,7 @@
 //! Builds the vendored rcheevos (rcheevos/README.md says which files and why) and the C shim
 //! over it into one static library. With the feature `libretro`, rcheevos' `rc_libretro.c` too,
-//! against the libretro.h in the folder `LIBRETRO_INCLUDE_DIR` names (rcheevos doesn't ship
-//! it; an app that runs libretro cores has its own).
+//! against the libretro.h in the folder `LIBRETRO_INCLUDE_DIR` names, or the copy in
+//! `libretro/` (rcheevos doesn't ship one).
 
 fn main() {
     let rc = "rcheevos";
@@ -38,11 +38,15 @@ fn main() {
         }
     }
     if std::env::var_os("CARGO_FEATURE_LIBRETRO").is_some() {
+        // The program's own libretro.h when it names one, else the copy here (libretro/, the
+        // API's header, MIT): rc_libretro.c reads only its memory map and memory ids, which
+        // every version since the map's has laid out the same.
         println!("cargo:rerun-if-env-changed=LIBRETRO_INCLUDE_DIR");
-        let dir = std::env::var_os("LIBRETRO_INCLUDE_DIR").expect(
-            "nib-cheevos: the feature `libretro` needs LIBRETRO_INCLUDE_DIR, the folder with libretro.h",
-        );
-        build.include(dir).file(format!("{rc}/src/rc_libretro.c"));
+        let dir = std::env::var_os("LIBRETRO_INCLUDE_DIR").unwrap_or_else(|| "libretro".into());
+        build
+            .include(dir)
+            .file(format!("{rc}/src/rc_libretro.c"))
+            .file("csrc/libretro.c");
     }
     // Encrypted images (3DS) and zip hashing (arcade sets, MS-DOS) are for consoles nibOS
     // doesn't play; a zipped game is unpacked here before it is hashed (src/hash.rs). Lua is
@@ -56,5 +60,6 @@ fn main() {
     println!("cargo:rerun-if-changed=csrc");
     println!("cargo:rerun-if-changed=rcheevos/src");
     println!("cargo:rerun-if-changed=rcheevos/include");
+    println!("cargo:rerun-if-changed=libretro");
     println!("cargo:rerun-if-changed=build.rs");
 }

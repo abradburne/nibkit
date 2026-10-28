@@ -98,6 +98,16 @@ pub type EventFn = extern "C" fn(event: *const Event, ud: *mut c_void);
 pub type DoneFn = extern "C" fn(result: c_int, error_message: *const c_char, ud: *mut c_void);
 pub type LogFn = extern "C" fn(message: *const c_char, ud: *mut c_void);
 
+/// `struct nib_rc_cdreader`: a disc reader for rhash (rcheevos' `rc_hash_cdreader_t`).
+#[repr(C)]
+pub struct CdReader {
+    pub open_track: extern "C" fn(path: *const c_char, track: u32) -> *mut c_void,
+    pub read_sector:
+        extern "C" fn(track: *mut c_void, sector: u32, buffer: *mut c_void, bytes: usize) -> usize,
+    pub close_track: extern "C" fn(track: *mut c_void),
+    pub first_track_sector: extern "C" fn(track: *mut c_void) -> u32,
+}
+
 /// `struct nib_rc_callbacks`.
 #[repr(C)]
 pub struct Callbacks {
@@ -228,6 +238,15 @@ extern "C" {
         out: *mut c_char,
         console_id: u32,
         path: *const c_char,
+        log: Option<LogFn>,
+        verbose: c_int,
+        ud: *mut c_void,
+    ) -> c_int;
+    pub fn nib_rc_hash_disc(
+        out: *mut c_char,
+        console_id: u32,
+        path: *const c_char,
+        reader: *const CdReader,
         log: Option<LogFn>,
         verbose: c_int,
         ud: *mut c_void,

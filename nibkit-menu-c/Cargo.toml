@@ -1,6 +1,6 @@
 [package]
 name = "nibkit-menu-c"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 rust-version = "1.87"
 description = "nibkit for C and C++ apps: DSlot's menu for the touch screen, DSlot's settings and an emulator's declared options, brightness, clock, battery and volume: a static library and include/nibkit_menu.h"

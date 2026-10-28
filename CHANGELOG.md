@@ -4,6 +4,33 @@ nibkit, nibkit-menu-c and nib-cheevos, which are released together. Until 0.1.0 
 nibkit-menu-c lived in nibOS's repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their
 history starts.
 
+## 0.2.1
+
+- **nib-cheevos** `libretro` (feature `libretro`): Rust bindings for rcheevos' `rc_libretro.c`, for
+  a program that runs libretro cores. `Regions::new(console_id, map, memory)` lays the console's
+  memory out in the service's address space over the core's own, from its memory map
+  (`RETRO_ENVIRONMENT_SET_MEMORY_MAPS`, as `MemoryDescriptor`s) or, without one, from what
+  `retro_get_memory_data` and `retro_get_memory_size` answer (`CoreMemory`), with rcheevos'
+  console table and its quirks for each; it reads in place (`Regions::read`, and it is a
+  `Memory` for `Client::frame`), `backed()` and `regions()` say what it found.
+  `disallowed_settings(library_name).allows(key, value)` and `system_allowed(library_name,
+  console_id)` are rcheevos' rules for a core's options and consoles; `verbose(true)` logs how it
+  maps a console. The feature builds against a copy of `libretro.h` (the API's header, MIT) in
+  `nib-cheevos/libretro/` unless `LIBRETRO_INCLUDE_DIR` names the program's own, so a program
+  needs nothing set to use it. Tests: the structs' layouts against C's, a map and the memory ids
+  for SNES, NES, Mega Drive, Game Gear, PC Engine, Neo Geo Pocket and PlayStation, the rules
+  for Snes9x and PCSX ReARMed.
+- **nib-cheevos** `chd` (feature `chd`): CHD disc images are hashed (`hash::file` on a `.chd`, or
+  on a playlist whose first disc is one), through a CD reader of rhash's shape over the `chd`
+  crate (chd-rs, BSD-3-Clause), which decompresses the image's hunks: the tracks from the
+  image's `CHT2`/`CHTR` metadata, padded as CHD pads them, sectors numbered as on the disc
+  (pregaps stored with a track included), a sector's user data as rhash's own reader gives it.
+  Checked on the RG DS+: Gran Turismo's `.chd` hashes to the service's hash for the game
+  (13e08c49...). Without the feature a CHD is `Error::Unsupported`, as before. The shim has
+  `nib_rc_hash_disc`, rhash with a program's own CD reader.
+- A patch version: everything is added; nothing in 0.2.0 changes. nibkit-menu-c:
+  `NIBKIT_MENU_VERSION` 201, the same calls.
+
 ## 0.2.0
 
 - **nib-cheevos**, a new crate (MIT): RetroAchievements for every nibOS emulator and DSlot, one

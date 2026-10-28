@@ -1,6 +1,6 @@
 [package]
 name = "nib-cheevos"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 rust-version = "1.87"
 description = "RetroAchievements for nibOS's emulators and launcher: rcheevos (vendored, MIT) for the session, the hashes and the service's requests; the launcher's sign-in hand-over; curl as the transport"
@@ -13,7 +13,7 @@ readme = "README.md"
 keywords = ["retroachievements", "rcheevos", "emulator", "nibos", "handheld"]
 categories = ["emulators", "api-bindings"]
 # The vendored rcheevos and the shim go with the crate.
-include = ["src/**/*.rs", "csrc", "rcheevos", "build.rs", "README.md", "LICENSE-MIT"]
+include = ["src/**/*.rs", "csrc", "rcheevos", "libretro", "build.rs", "README.md", "LICENSE-MIT"]
 # One copy of rcheevos in a program: two would clash at link time.
 links = "nib_rcheevos"
 
@@ -28,6 +28,9 @@ hash = []
 # Zipped games hashed as the ROM inside (`hash::file` on a .zip).
 zip = ["hash", "dep:zip"]
 api = []
+# CHD disc images hashed (`hash::file` on a .chd, or a playlist whose first disc is one): a CD
+# reader for rhash over the `chd` crate (BSD-3-Clause), which decompresses them.
+chd = ["hash", "dep:chd"]
 # rcheevos' rc_libretro.c (memory maps of libretro cores, the settings and systems it allows
 # for a core): needs LIBRETRO_INCLUDE_DIR, the folder with libretro.h (build.rs).
 libretro = []
@@ -36,6 +39,8 @@ libretro = []
 libc = "0.2"
 # A zipped game's ROM, unpacked to be hashed (`zip`): as DSlot reads zips.
 zip = { version = "2.4.2", default-features = false, features = ["deflate-miniz"], optional = true }
+# A CHD's hunks, decompressed (`chd`).
+chd = { version = "0.3", optional = true }
 
 [build-dependencies]
 cc = "1"

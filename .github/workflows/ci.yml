@@ -36,6 +36,7 @@ jobs:
       - name: clippy, nib-cheevos (all of it, an emulator's part, a launcher's part)
         run: |
           cargo clippy -p nib-cheevos --all-targets -- -D warnings
+          cargo clippy -p nib-cheevos --all-targets --all-features -- -D warnings
           cargo clippy -p nib-cheevos --all-targets --no-default-features --features client,hash -- -D warnings
           cargo clippy -p nib-cheevos --all-targets --no-default-features --features zip,api -- -D warnings
       - name: tests, a desktop
@@ -45,7 +46,7 @@ jobs:
       - name: tests, nibkit-menu-c
         run: cargo test -p nibkit-menu-c
       - name: tests, nib-cheevos
-        run: cargo test -p nib-cheevos
+        run: cargo test -p nib-cheevos --all-features
 
   msrv:
     runs-on: ubuntu-latest

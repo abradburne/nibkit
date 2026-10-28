@@ -195,6 +195,19 @@ int nib_rc_hash_file(char out[33], uint32_t console_id, const char* path, nib_rc
 int nib_rc_hash_buffer(char out[33], uint32_t console_id, const char* name, const uint8_t* data,
                        size_t size, nib_rc_log_fn log, int verbose, void* ud);
 
+/* A disc image rhash's own CD reader doesn't open (CHD): the program's reader, rhash's
+ * rc_hash_cdreader_t's four calls with their meaning (src/chd.rs has one). */
+typedef struct nib_rc_cdreader {
+  void* (*open_track)(const char* path, uint32_t track);
+  size_t (*read_sector)(void* track, uint32_t sector, void* buffer, size_t requested_bytes);
+  void (*close_track)(void* track);
+  uint32_t (*first_track_sector)(void* track);
+} nib_rc_cdreader;
+
+/* As nib_rc_hash_file, the disc at `path` read through `reader`. */
+int nib_rc_hash_disc(char out[33], uint32_t console_id, const char* path,
+                     const nib_rc_cdreader* reader, nib_rc_log_fn log, int verbose, void* ud);
+
 /* --- rapi: requests built and answers read by rcheevos ------------------------------------ */
 
 /* What an answer of the service came to: a NIB_RC_* result, and the service's (or the

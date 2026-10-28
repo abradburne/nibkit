@@ -14,9 +14,10 @@
 //! as that file (with the feature `zip`; without it a zip is an [`Error::Unsupported`]). Discs are hashed from their cue sheet (and the tracks it names), a playlist
 //! (`.m3u`, its first disc) or an image rhash reads itself; never zipped.
 //!
-//! Not yet: CHD disc images (rhash has no CHD reader of its own; one would be given to it as a
-//! custom CD reader, `rc_hash_cdreader_t`), and Game & Watch units, which rhash 12.4 has no rule
-//! for. Both are an [`Error::Unsupported`].
+//! A CHD disc image (or a playlist whose first disc is one) is read through a CD reader of
+//! nib-cheevos' own over the `chd` crate, with the feature `chd`; without it, it is an
+//! [`Error::Unsupported`]. Not yet: Game & Watch units, which rhash 12.4 has no rule for (an
+//! [`Error::Unsupported`] too).
 
 use crate::ffi;
 use std::ffi::{c_char, c_int, c_void, CString};
@@ -120,7 +121,8 @@ pub fn console_id(system: &str) -> Option<u32> {
 pub enum Error {
     /// No console is named so.
     UnknownSystem(String),
-    /// Not hashed here yet: a CHD image, a zipped disc, a Game & Watch unit.
+    /// Not hashed here: a CHD image without the feature `chd`, a zipped disc, a Game & Watch
+    /// unit.
     Unsupported(String),
     /// The file, or the zip, couldn't be read.
     Read(String),
@@ -155,8 +157,8 @@ pub fn file(system: &str, path: &Path) -> Result<String, Error> {
             "rcheevos has no rule for Game & Watch units".into(),
         ));
     }
-    if ext == "chd" {
-        return Err(Error::Unsupported("CHD images".into()));
+    if ext == "chd" || (ext == "m3u" && first_disc_is_chd(path)) {
+        return chd(console, path);
     }
     if ext == "zip" {
         if console.disc {
@@ -170,6 +172,53 @@ pub fn file(system: &str, path: &Path) -> Result<String, Error> {
         // SAFETY: `out` has 33 bytes; the path is NUL-terminated and valid for the call; the
         // log callback and its `ud` are valid for the call.
         unsafe { ffi::nib_rc_hash_file(out, console.id, c_path.as_ptr(), log, 0, ud) }
+    })
+}
+
+/// A CHD disc image's hash (feature `chd`): rhash reads it through the CD reader in
+/// `src/chd.rs`, as it reads the disc from a cue sheet.
+#[cfg(feature = "chd")]
+fn chd(console: &Console, path: &Path) -> Result<String, Error> {
+    if !console.disc {
+        return Err(Error::Unsupported(format!(
+            "a CHD of a {} game",
+            console.name
+        )));
+    }
+    let c_path = CString::new(path.to_string_lossy().as_bytes())
+        .map_err(|_| Error::Read(format!("{}: a NUL in the path", path.display())))?;
+    rhash(|out, log, ud| {
+        // SAFETY: `out` has 33 bytes; the path is NUL-terminated and the reader static, both
+        // valid for the call; the log callback and its `ud` are valid for the call.
+        unsafe {
+            ffi::nib_rc_hash_disc(
+                out,
+                console.id,
+                c_path.as_ptr(),
+                &crate::chd::READER,
+                log,
+                0,
+                ud,
+            )
+        }
+    })
+}
+
+/// Without the CHD reader, a CHD isn't hashed.
+#[cfg(not(feature = "chd"))]
+fn chd(_: &Console, _: &Path) -> Result<String, Error> {
+    Err(Error::Unsupported(
+        "CHD images (nib-cheevos' feature `chd`)".into(),
+    ))
+}
+
+/// Whether a playlist's first disc, the one rhash hashes, is a CHD image.
+fn first_disc_is_chd(path: &Path) -> bool {
+    std::fs::read_to_string(path).is_ok_and(|text| {
+        text.lines()
+            .map(str::trim)
+            .find(|l| !l.is_empty() && !l.starts_with('#'))
+            .is_some_and(|l| extension(Path::new(l)) == "chd")
     })
 }
 
@@ -471,7 +520,7 @@ mod tests {
     /// reader, finds SYSTEM.CNF and hashes the boot executable it names (here none: no hash,
     /// but rhash said why). What isn't done yet says so.
     #[test]
-    fn discs_are_read_from_their_cue_sheet_and_chd_is_not_yet() {
+    fn discs_are_read_from_their_cue_sheet_or_a_chd() {
         let dir = temp("disc");
         let bin = dir.join("Game.bin");
         std::fs::write(&bin, vec![0u8; 2352 * 32]).unwrap();
@@ -485,8 +534,15 @@ mod tests {
             Err(Error::Rhash(why)) => assert!(!why.is_empty(), "rhash says why"),
             other => panic!("{other:?}"),
         }
+        // A CHD with the feature `chd` is read (here there is none to read); without, it isn't.
+        let chd = file("PS", &dir.join("Game.chd"));
+        if cfg!(feature = "chd") {
+            assert!(matches!(chd, Err(Error::Rhash(_))), "{chd:?}");
+        } else {
+            assert!(matches!(chd, Err(Error::Unsupported(_))), "{chd:?}");
+        }
         assert!(matches!(
-            file("PS", &dir.join("Game.chd")),
+            file("SFC", &dir.join("Game.chd")),
             Err(Error::Unsupported(_))
         ));
         assert!(matches!(

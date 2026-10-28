@@ -9,6 +9,9 @@
 //!   console nibOS plays, named as the `Roms/` folders are.
 //! - [`api`] (feature `api`): the requests a launcher makes outside a game (signing in, a game's
 //!   sets, the player's unlocks), built and read by rcheevos.
+//! - [`libretro`] (feature `libretro`): for a program that runs libretro cores, the console's
+//!   memory over the core's (its memory map, or its memory ids), and the core options and
+//!   consoles rcheevos rules out for a core, by rcheevos' `rc_libretro.c`.
 //! - [`launch`]: the sign-in, from DSlot to the game: the token file and the environment.
 //! - [`ua`]: the User-Agent every request carries.
 //! - [`paths`]: the service's hosts, the badge cache every app shares, the service's warnings.
@@ -20,12 +23,16 @@
 pub mod api;
 #[cfg(feature = "client")]
 pub mod badges;
+#[cfg(feature = "chd")]
+mod chd;
 #[cfg(feature = "client")]
 pub mod client;
 mod ffi;
 #[cfg(feature = "hash")]
 pub mod hash;
 pub mod launch;
+#[cfg(feature = "libretro")]
+pub mod libretro;
 pub mod paths;
 #[cfg(any(feature = "client", feature = "api"))]
 mod transport;

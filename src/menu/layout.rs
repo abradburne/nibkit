@@ -12,8 +12,12 @@ pub const TOP: f32 = 156.0;
 pub const ROW_STEP: f32 = 46.0;
 /// How many rows fit on the screen.
 pub const VISIBLE: usize = 10;
-/// The tabs: the first one's corner, and each one's size.
+/// The tabs: the first one's corner, and each one's size (a long label's is wider: [`tab_widths`]).
 pub const TABS: (f32, f32, f32, f32) = (28.0, 10.0, 130.0, 40.0);
+/// The room a tab keeps either side of a label too long for TABS' width ("Achievements").
+pub const TAB_PAD: f32 = 16.0;
+/// A tab's label: its size, bold.
+const TAB_TEXT: f32 = 22.0;
 /// Where labels start, in screen units.
 pub const LEFT: f32 = 150.0;
 /// Where values end, in screen units.
@@ -166,7 +170,36 @@ pub fn row_hit(y: f32) -> Option<usize> {
     (0..VISIBLE).find(|&r| (y - row_y(r)).abs() < ROW_STEP / 2.0)
 }
 
-/// The tab under a touch, of `n`.
+/// How wide text is, near enough, with no font to measure it by: what [`menu`] lays out with,
+/// and what tabs are sized by, so that a tap finds the tab drawn there whatever the font.
+fn estimate(s: &str, size: f32) -> f32 {
+    s.chars().count() as f32 * size * 0.45
+}
+
+/// Each tab's width: TABS' own, or wider for a label that needs more, with [`TAB_PAD`] either
+/// side of it.
+pub fn tab_widths<S: AsRef<str>>(labels: &[S]) -> Vec<f32> {
+    labels
+        .iter()
+        .map(|l| (estimate(l.as_ref(), TAB_TEXT) + 2.0 * TAB_PAD).max(TABS.2))
+        .collect()
+}
+
+/// The tab under a touch, of tabs labelled `labels` ([`tab_widths`]).
+pub fn tab_at<S: AsRef<str>>(x: f32, y: f32, labels: &[S]) -> Option<usize> {
+    let (tx, ty, _, h) = TABS;
+    if !(ty - 10.0..ty + h + 14.0).contains(&y) || x < tx || x >= W {
+        return None;
+    }
+    let mut right = tx;
+    tab_widths(labels).into_iter().position(|w| {
+        right += w;
+        x < right
+    })
+}
+
+/// The tab under a touch, of `n` all TABS' width: [`tab_at`] for tabs whose labels may need
+/// more.
 pub fn tab_hit(x: f32, y: f32, n: usize) -> Option<usize> {
     let (tx, ty, w, h) = TABS;
     let inside = n > 0
@@ -189,9 +222,9 @@ fn text(s: &str, (size, bold): (f32, bool), (x, y): (f32, f32), anchor: f32, col
 }
 
 fn tabs(out: &mut Vec<Draw>, tabs: &[(String, bool)]) {
-    let (x, y, w, h) = TABS;
-    for (i, (label, on)) in tabs.iter().enumerate() {
-        let at = x + i as f32 * w;
+    let (mut at, y, _, h) = TABS;
+    let labels: Vec<&str> = tabs.iter().map(|(l, _)| l.as_str()).collect();
+    for ((label, on), w) in tabs.iter().zip(tab_widths(&labels)) {
         out.push(Draw::Rect {
             x: at,
             y,
@@ -202,11 +235,12 @@ fn tabs(out: &mut Vec<Draw>, tabs: &[(String, bool)]) {
         let ink = if *on { colour::TAB_INK } else { colour::DIM };
         out.push(text(
             label,
-            (22.0, true),
+            (TAB_TEXT, true),
             (at + (w - 2.0) / 2.0, y + 7.0),
             0.5,
             ink,
         ));
+        at += w;
     }
 }
 
@@ -252,9 +286,7 @@ fn footer(out: &mut Vec<Draw>, hint: &str, status: &Status) {
 /// A page of rows, as DSlot's menu draws one. A row's note goes left of its value by an
 /// estimate of the value's width; [`menu_measured`] places it exactly.
 pub fn menu(m: &Menu, status: &Status) -> Vec<Draw> {
-    menu_measured(m, status, |s, size, _| {
-        s.chars().count() as f32 * size * 0.45
-    })
+    menu_measured(m, status, |s, size, _| estimate(s, size))
 }
 
 /// [`menu`], with `width(text, size, bold)` saying how wide text is drawn, in screen units:
@@ -692,6 +724,22 @@ mod tests {
         assert_eq!(tab_hit(30.0, 20.0, 5), Some(0));
         assert_eq!(tab_hit(300.0, 20.0, 5), Some(2));
         assert_eq!(tab_hit(300.0, 20.0, 2), None);
+        // A label too long for a tab widens that tab alone, and taps follow it.
+        let labels = ["Game", "DS", "System", "Achievements", "Update"];
+        let widths = tab_widths(&labels);
+        assert_eq!(&widths[..3], [130.0; 3]);
+        assert!(widths[3] > 140.0 && widths[3] < 160.0, "{}", widths[3]);
+        assert_eq!(widths[4], 130.0);
+        assert_eq!(tab_at(28.0 + 3.0 * 130.0 + 10.0, 20.0, &labels), Some(3));
+        assert_eq!(tab_at(28.0 + 4.0 * 130.0 + 10.0, 20.0, &labels), Some(3));
+        assert_eq!(
+            tab_at(28.0 + 4.0 * 130.0 + widths[3] - 10.0, 20.0, &labels),
+            Some(4)
+        );
+        assert_eq!(tab_at(28.0 + 5.0 * 130.0 + widths[3], 20.0, &labels), None);
+        assert_eq!(tab_at(20.0, 20.0, &labels), None);
+        assert_eq!(tab_at(100.0, 100.0, &labels), None);
+        assert_eq!(tab_at::<&str>(100.0, 20.0, &[]), None);
         let s = Shelf {
             cards: vec![
                 Card::resume(None, "r"),

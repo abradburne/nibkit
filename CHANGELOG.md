@@ -4,6 +4,13 @@ nibkit, nibkit-menu-c and nib-cheevos, which are released together. Until 0.1.0 
 nibkit-menu-c lived in nibOS's repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their
 history starts.
 
+## Unreleased
+
+- **menu**: a tab whose label is too long for its 130 is as wide as the label with 16 either
+  side ("Achievements"); the others stay 130. `layout::tab_widths` says each one's width and
+  `layout::tab_at(x, y, labels)` finds the one under a touch (`tab_hit` still takes them all
+  130 wide).
+
 ## 0.2.1
 
 - **nib-cheevos** `libretro` (feature `libretro`): Rust bindings for rcheevos' `rc_libretro.c`, for

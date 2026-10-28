@@ -146,7 +146,8 @@ impl Menu {
 
     /// A finger down at `(x, y)` (screen units).
     pub fn touch(&mut self, x: f32, y: f32) -> Option<Effect> {
-        if let Some(t) = layout::tab_hit(x, y, self.tabs.len()) {
+        let labels: Vec<&str> = self.tabs.iter().map(|(l, _)| l.as_str()).collect();
+        if let Some(t) = layout::tab_at(x, y, &labels) {
             return (!self.tabs[t].1).then_some(Effect::Page(t));
         }
         let i = self.scroll + layout::row_hit(y)?;
@@ -197,7 +198,8 @@ impl Shelf {
 
     /// A finger down: a neighbour comes to the middle; the middle card loads, as A would.
     pub fn touch(&mut self, x: f32, y: f32) -> Option<Effect> {
-        if let Some(t) = layout::tab_hit(x, y, self.tabs.len()) {
+        let labels: Vec<&str> = self.tabs.iter().map(|(l, _)| l.as_str()).collect();
+        if let Some(t) = layout::tab_at(x, y, &labels) {
             return (!self.tabs[t].1).then_some(Effect::Page(t));
         }
         match layout::card_hit(self, x, y)? {

@@ -9,6 +9,13 @@ written in C++ (DSperate) shows the same menu as DSlot and inkdot through it:
 - **The Connections page:** Wi-Fi and Bluetooth on or off and the paired devices to connect, as
   DSlot shows them, for a pause menu: `nib_connections_new`, `_fill`, `_act` (nibOS; NULL on the
   stock OS).
+- **Toasts:** a short notice over a game that is playing, in DSlot's style (a heading coloured
+  by its kind, a title with its points, a line under it, a picture such as an achievement's
+  badge at the left), drawn into a picture of its own size with alpha and the corner to lay it
+  at, for a frame of any size: `nib_toast_begin` (or `_unlock`), `_header`, `_detail`,
+  `_points`, `_badge`, `_render`; and `nib_toasts_*`, the queue that shows them one at a time
+  for their kind's time, an unlock waiting a moment for its badge.
+- **Versions:** `NIBKIT_MENU_VERSION` in the header, `nib_menu_version()` in the library.
 - **What the pages show:** DSlot's settings file and the emulator's options as its description
   declares them (values, "Use NDS (2x)", stepping, the command-line words), and the System page's
   brightness, clock, battery and volume.

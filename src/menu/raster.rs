@@ -73,6 +73,17 @@ impl Canvas {
         Canvas { w, h, px, scale }
     }
 
+    /// A clear picture `w` × `h` pixels (every byte 0: wholly transparent), `scale` pixels to a
+    /// unit: one of its own size, such as a toast, rather than the screen's.
+    pub fn blank(w: usize, h: usize, scale: f32) -> Canvas {
+        Canvas {
+            w,
+            h,
+            px: vec![0; w * h * 4],
+            scale,
+        }
+    }
+
     /// Fills the whole picture with `c`.
     pub fn clear(&mut self, c: Rgb) {
         for p in self.px.chunks_exact_mut(4) {
@@ -85,10 +96,7 @@ impl Canvas {
             return;
         }
         let i = (y as usize * self.w + x as usize) * 4;
-        let a = a.min(1.0);
-        for (d, &s) in self.px[i..i + 3].iter_mut().zip(&c) {
-            *d = (*d as f32 + (s as f32 - *d as f32) * a).round() as u8;
-        }
+        mix(&mut self.px[i..i + 3], c, a);
     }
 
     fn fill(&mut self, x: f32, y: f32, w: f32, h: f32, c: Rgb) {
@@ -102,24 +110,63 @@ impl Canvas {
         }
     }
 
-    /// Covers each pixel of a box by how much of it `inside` says is in the shape (4 × 4
-    /// samples), in `c`.
-    fn shape(
+    /// Covers each pixel of a box by how much of it is in the shape, in `c`; see [`cover`].
+    ///
+    /// [`cover`]: Canvas::cover
+    fn shape(&mut self, bbox: (f32, f32, f32, f32), c: Rgb, edge: impl Fn(f32, f32) -> f32) {
+        self.cover(bbox, edge, |p, a| mix(&mut p[..3], c, a));
+    }
+
+    /// Calls `paint` with each pixel of a box (its 4 bytes) that a shape covers, and how much of
+    /// it the shape covers (above 0, up to 1). The shape is where `edge` (at a point in screen
+    /// units) is below 0; `edge` is the distance to its edge, negative inside, or anything that
+    /// changes no faster than that distance does (a rounded box's is exact; one shape less
+    /// another, the larger of the two, is such a bound). A pixel whose centre is further from the
+    /// edge than its corners are is wholly in or out, and its distance vouches for the pixels
+    /// after it in the row as far as it reaches, so only the pixels the edge crosses are sampled
+    /// (4 × 4): a large shape costs about its outline. A shape known only point by point is
+    /// [`sampled`] everywhere.
+    pub(super) fn cover(
         &mut self,
         (x, y, w, h): (f32, f32, f32, f32),
-        c: Rgb,
-        inside: impl Fn(f32, f32) -> bool,
+        edge: impl Fn(f32, f32) -> f32,
+        mut paint: impl FnMut(&mut [u8], f32),
     ) {
         let s = self.scale;
-        for py in (y * s).floor() as i32..((y + h) * s).ceil() as i32 {
-            for px in (x * s).floor() as i32..((x + w) * s).ceil() as i32 {
-                let mut n = 0;
-                for k in 0..16 {
-                    let sx = (px as f32 + ((k % 4) as f32 + 0.5) / 4.0) / s;
-                    let sy = (py as f32 + ((k / 4) as f32 + 0.5) / 4.0) / s;
-                    n += inside(sx, sy) as u32;
+        // A pixel's half-diagonal in units (√2 / 2), and a little over for rounding.
+        let sure = 0.75 / s;
+        let (x0, x1) = ((x * s).floor().max(0.0), ((x + w) * s).ceil().max(0.0));
+        let (y0, y1) = ((y * s).floor().max(0.0), ((y + h) * s).ceil().max(0.0));
+        let (x1, y1) = ((x1 as usize).min(self.w), (y1 as usize).min(self.h));
+        for py in y0 as usize..y1 {
+            let mut px = x0 as usize;
+            while px < x1 {
+                let d = edge((px as f32 + 0.5) / s, (py as f32 + 0.5) / s);
+                if d.abs() > sure {
+                    // Wholly in or out, and so are the next pixels until the edge could be
+                    // within one of them: the edge moves no faster than the distance does.
+                    let run = 1 + (((d.abs() - sure) * s) as usize).min(x1 - px - 1);
+                    if d < 0.0 {
+                        for p in px..px + run {
+                            let i = (py * self.w + p) * 4;
+                            paint(&mut self.px[i..i + 4], 1.0);
+                        }
+                    }
+                    px += run;
+                    continue;
                 }
-                self.blend(px, py, c, n as f32 / 16.0);
+                let n = (0..16)
+                    .filter(|k| {
+                        let sx = (px as f32 + ((k % 4) as f32 + 0.5) / 4.0) / s;
+                        let sy = (py as f32 + ((k / 4) as f32 + 0.5) / 4.0) / s;
+                        edge(sx, sy) < 0.0
+                    })
+                    .count();
+                if n > 0 {
+                    let i = (py * self.w + px) * 4;
+                    paint(&mut self.px[i..i + 4], n as f32 / 16.0);
+                }
+                px += 1;
             }
         }
     }
@@ -185,7 +232,7 @@ impl Canvas {
                 } => {
                     let (x, y, w, h, r) = (*x, *y, *w, *h, *radius);
                     self.shape((x, y, w, h), *colour, |px, py| {
-                        rounded(px, py, (x, y, w, h), r)
+                        edge(px, py, (x, y, w, h), r)
                     });
                 }
                 Draw::Frame {
@@ -199,13 +246,12 @@ impl Canvas {
                 } => {
                     let (x, y, w, h, r, t) = (*x, *y, *w, *h, *radius, *width);
                     self.shape((x, y, w, h), *colour, |px, py| {
-                        rounded(px, py, (x, y, w, h), r)
-                            && !rounded(
-                                px,
-                                py,
-                                (x + t, y + t, w - 2.0 * t, h - 2.0 * t),
-                                (r - t).max(0.0),
-                            )
+                        edge(px, py, (x, y, w, h), r).max(-edge(
+                            px,
+                            py,
+                            (x + t, y + t, w - 2.0 * t, h - 2.0 * t),
+                            (r - t).max(0.0),
+                        ))
                     });
                 }
                 Draw::Text {
@@ -230,7 +276,7 @@ impl Canvas {
                         self.shape(
                             (cx - ICON / 2.0, cy - ICON / 2.0, ICON, ICON),
                             c,
-                            |px, py| poly(px, py, &points),
+                            sampled(|px, py| poly(px, py, &points)),
                         );
                     }
                 }
@@ -275,8 +321,8 @@ impl Canvas {
         }
     }
 
-    /// A picture fitted into a box (its proportions kept, centred), nearest pixel; faded
-    /// towards black for a card aside.
+    /// A picture fitted into a box (its proportions kept, centred), nearest pixel, over what is
+    /// there by its alpha; faded towards black for a card aside.
     fn picture(
         &mut self,
         rgba: &[u8],
@@ -306,7 +352,7 @@ impl Canvas {
                 let sx =
                     ((px - x0) as usize * pw / (x1 - x0).max(1) as usize).min(pw.saturating_sub(1));
                 let i = (sy * pw + sx) * 4;
-                let Some(p) = rgba.get(i..i + 3) else {
+                let Some(p) = rgba.get(i..i + 4) else {
                     continue;
                 };
                 let c = [
@@ -314,7 +360,7 @@ impl Canvas {
                     (p[1] as f32 * k) as u8,
                     (p[2] as f32 * k) as u8,
                 ];
-                self.blend(px, py, c, 1.0);
+                self.blend(px, py, c, p[3] as f32 / 255.0);
             }
         }
     }
@@ -427,7 +473,7 @@ impl Canvas {
             ),
         ];
         for (c, inside) in &layers {
-            self.shape((x, y, w, h), *c, inside);
+            self.shape((x, y, w, h), *c, sampled(inside));
         }
     }
 }
@@ -435,11 +481,31 @@ impl Canvas {
 /// A test of whether a point (in screen units) is in a shape.
 type Inside<'a> = Box<dyn Fn(f32, f32) -> bool + 'a>;
 
-/// Whether a point is inside a rectangle with rounded corners.
-fn rounded(x: f32, y: f32, (rx, ry, rw, rh): (f32, f32, f32, f32), r: f32) -> bool {
+/// Moves `d` (red, green, blue) towards `c` by `a` (0-1).
+pub(super) fn mix(d: &mut [u8], c: Rgb, a: f32) {
+    let a = a.min(1.0);
+    for (d, &s) in d.iter_mut().zip(&c) {
+        *d = (*d as f32 + (s as f32 - *d as f32) * a).round() as u8;
+    }
+}
+
+/// How far a point is from the edge of a rectangle with rounded corners, negative inside: the
+/// distance itself, for [`Canvas::cover`].
+pub(super) fn edge(x: f32, y: f32, (rx, ry, rw, rh): (f32, f32, f32, f32), r: f32) -> f32 {
     let dx = (x - rx - rw / 2.0).abs() - rw / 2.0 + r;
     let dy = (y - ry - rh / 2.0).abs() - rh / 2.0 + r;
-    dx.max(0.0).hypot(dy.max(0.0)) + dx.max(dy).min(0.0) - r < 0.0
+    dx.max(0.0).hypot(dy.max(0.0)) + dx.max(dy).min(0.0) - r
+}
+
+/// Whether a point is inside a rectangle with rounded corners.
+fn rounded(x: f32, y: f32, rect: (f32, f32, f32, f32), r: f32) -> bool {
+    edge(x, y, rect, r) < 0.0
+}
+
+/// A shape known only point by point (a star, the battery's parts) as [`Canvas::cover`]'s
+/// edge: never far from it, so each pixel in its box is sampled.
+fn sampled(inside: impl Fn(f32, f32) -> bool) -> impl Fn(f32, f32) -> f32 {
+    move |x, y| if inside(x, y) { -f32::EPSILON } else { 0.0 }
 }
 
 /// Whether a point is inside a polygon (even-odd).

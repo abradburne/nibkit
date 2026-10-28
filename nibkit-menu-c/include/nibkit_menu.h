@@ -31,6 +31,17 @@
 extern "C" {
 #endif
 
+/* This header's version: major * 10000 + minor * 100 + patch (0.1.2). */
+#define NIBKIT_MENU_VERSION 102
+
+/* The library's version, as NIBKIT_MENU_VERSION in the header it was built with: a program
+ * that uses a function added after the oldest library it supports checks it at run time. */
+int nib_menu_version(void);
+/* The pixels to a screen unit for a frame `width` x `height` pixels (the screen is 1024 x 768
+ * units): the most at which the screen fits in it, keeping its shape, never below 0.05. 1 on the
+ * RG DS+'s panels, 0.25 on a DS screen's 256 x 192. */
+float nib_menu_scale_for(int width, int height);
+
 typedef struct NibMenu NibMenu;
 
 /* What a row shows on its right. `text` is the value; `number` is a rating (0-5) or a level
@@ -240,6 +251,96 @@ const char *nib_connections_hint(void);
 int nib_connections_fill(NibConnections *c, NibMenu *m);
 /* Acts on the page's row `row` (counted from its first): 1 if it did something. */
 int nib_connections_act(NibConnections *c, int row);
+
+/* ---- Toasts over a game that is playing -----------------------------------------------------
+ *
+ * DSlot's style for a short notice, the same in every app: a rounded panel with a heading in
+ * the colour of its kind, a title in white with an unlock's points in gold at its right, a
+ * detail line under them, and a badge (RGBA, rows top first) square at the left, as tall as the
+ * lines; as wide as its longest line wants within two thirds of the screen, long lines ending
+ * in an ellipsis. Drawn for a frame of any size at nib_menu_scale_for's scale, into RGBA with
+ * straight alpha (clear corners, the panel a little see-through), `*width` x `*height`, sized to
+ * the toast, with `*x`, `*y` where its top left goes on the frame: the bottom right, a margin
+ * in, the corner every app's toast sits in. Any out pointer may be NULL.
+ *
+ * A NibToast is filled a call at a time, as a page is: nib_toast_begin (or nib_toast_unlock)
+ * clears it, then the parts. Strings and the badge are copied, so they need only live through
+ * the call. Draw one yourself with nib_toast_render, or queue it:
+ *
+ *     NibToasts *q = nib_toasts_new();
+ *     NibToast *t = nib_toast_new();
+ *     // something to say:
+ *     nib_toast_unlock(t, "First Blood", "Win a battle", 25);
+ *     nib_toast_await_badge(t, "123456");          // fetched elsewhere, by its name
+ *     nib_toasts_push(q, t);                       // copied: t can be begun again at once
+ *     // the badge arrives (copied):
+ *     nib_toasts_badge(q, "123456", rgba, 64, 64);
+ *     // once a frame:
+ *     uint64_t shown = nib_toasts_tick(q, now_ms);
+ *     if (shown != last) {                         // another toast, or its badge came
+ *         int w, h, x, y;
+ *         const uint8_t *px = nib_toasts_render(q, frame_w, frame_h, &w, &h, &x, &y);
+ *         // px NULL: nothing to show; else lay it over the frame at (x, y) until it changes
+ *         last = shown;
+ *     }
+ *
+ * The queue shows one toast at a time, in turn, each for its kind's time (an unlock 4 s,
+ * anything else 2.5 s; nib_toast_shows for another), an unlock awaiting its badge waiting for
+ * it up to 1.5 s at the head of the queue and then showing without it (taking it if it comes
+ * later). `now_ms` is any clock in milliseconds that only goes forward: SDL_GetTicks(), or the
+ * frames played x 1000 / 60 for toasts that wait while the game is paused. A picture is valid
+ * until the next call on its NibToast or NibToasts. Drawing is text rasterised (a few
+ * milliseconds): nib_toasts_render draws once per toast and frame size and hands back the same
+ * picture after, but keep the call that draws off a real-time thread (or drop to SCHED_OTHER
+ * around it). */
+typedef struct NibToast NibToast;
+typedef struct NibToasts NibToasts;
+
+enum {
+    NIB_TOAST_INFO = 0,    /* the heading dim */
+    NIB_TOAST_UNLOCK = 1,  /* the heading gold: an achievement */
+    NIB_TOAST_PROBLEM = 2, /* the heading red */
+};
+
+NibToast *nib_toast_new(void);
+void nib_toast_free(NibToast *t);
+/* Starts a toast of `kind` saying `title`: no heading, detail, points or badge, its kind's
+ * time. */
+void nib_toast_begin(NibToast *t, int kind, const char *title);
+/* Starts an achievement unlocked: headed "Achievement unlocked" in gold, its title, detail (NULL
+ * for none) and points. */
+void nib_toast_unlock(NibToast *t, const char *title, const char *detail, int points);
+void nib_toast_header(NibToast *t, const char *header);
+void nib_toast_detail(NibToast *t, const char *detail);
+/* An unlock's points, at the title's right ("1 point", "25 points"); 0 for none. */
+void nib_toast_points(NibToast *t, int points);
+/* The badge: `rgba` is `width` x `height` x 4 bytes, straight alpha, copied during the call. */
+void nib_toast_badge(NibToast *t, const uint8_t *rgba, int width, int height);
+/* The badge is on its way and will come to nib_toasts_badge as `name`. */
+void nib_toast_await_badge(NibToast *t, const char *name);
+/* How long it shows in a queue, instead of its kind's time. */
+void nib_toast_shows(NibToast *t, int ms);
+/* The toast drawn for a `frame_w` x `frame_h` frame; valid until the next call on `t`. */
+const uint8_t *nib_toast_render(NibToast *t, int frame_w, int frame_h, int *width, int *height,
+                                int *x, int *y);
+
+NibToasts *nib_toasts_new(void);
+void nib_toasts_free(NibToasts *q);
+/* Queues what `t` says, after those waiting; its id (never 0), as nib_toasts_shown_id gives it. */
+uint64_t nib_toasts_push(NibToasts *q, const NibToast *t);
+/* A badge arrives, copied: every toast awaiting `name` has it, the one on show too. */
+void nib_toasts_badge(NibToasts *q, const char *name, const uint8_t *rgba, int width, int height);
+/* What is on show at `now_ms`, moving to the next toast when its time is up: 0 for nothing,
+ * else a number that changes whenever what is shown does (time to render it again). */
+uint64_t nib_toasts_tick(NibToasts *q, uint64_t now_ms);
+/* Which toast is on show, as nib_toasts_push numbered it; 0 for none. */
+uint64_t nib_toasts_shown_id(const NibToasts *q);
+/* The toast on show drawn for a `frame_w` x `frame_h` frame (once, then kept); NULL for none.
+ * Valid until the next call on `q`. */
+const uint8_t *nib_toasts_render(NibToasts *q, int frame_w, int frame_h, int *width,
+                                 int *height, int *x, int *y);
+/* Drops every toast, the one on show too. */
+void nib_toasts_clear(NibToasts *q);
 
 #ifdef __cplusplus
 }

@@ -3,6 +3,38 @@
 nibkit and nibkit-menu-c, which are released together. Until 0.1.0 they lived in nibOS's
 repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their history starts.
 
+## 0.1.2
+
+- `menu::toast` (feature `menu-raster`): the toast over a game that is playing, in DSlot's
+  style, and the way toasts come and go, the same in every app. A `Queue` of `Notice`s
+  (owned; `Notice::new(kind, title)`, `Notice::unlock(title, detail, points)` with the
+  "Achievement unlocked" heading, and setters for the heading, detail, points, badge and time):
+  `push`, then `tick(now)` once a frame for the `Shown` one, one at a time and in turn, each
+  for its `Kind::shows()` (an unlock 4 s, anything else 2.5 s); an unlock whose badge is on its
+  way (`awaits_badge(name)`) waits for `Queue::badge(name, ..)` up to `BADGE_WAIT` (1.5 s) at
+  the head of the queue. `Queue::draw(fonts, scale)` draws the shown toast's picture once and
+  keeps it; `Shown::serial` says when it changed. `draw(fonts, &Said, scale)` draws one toast
+  from borrowed words (`Said::new(kind, title)` and setters, `Said::unlock`) into a `Toast`
+  (RGBA with straight alpha, its own size), as wide as its longest line within two thirds of
+  the screen, long lines ending in an ellipsis; `lay` puts it over a `Canvas`, `place` and
+  `Toast::place` say where on any frame: the bottom right, `MARGIN` (16 units) in. `Kind` and
+  `Said` are `#[non_exhaustive]`, so either can grow. nibkit-menu-c's `nib_toast_*` and
+  `nib_toasts_*`, and inkdot's and DSperate's notices, are this one.
+- nibkit-menu-c: the toast and its queue for C and C++, in the `nib_menu_*` style, so they can
+  grow: `nib_toast_begin(t, kind, title)` or `nib_toast_unlock(t, title, detail, points)`,
+  then `_header`, `_detail`, `_points`, `_badge` (copied), `_await_badge`, `_shows`, and
+  `nib_toast_render(t, frame_w, frame_h, ..)` giving the picture and where on the frame it
+  goes; `nib_toasts_*`, the queue (`_push`, `_badge`, `_tick(now_ms)`, `_render`,
+  `_shown_id`, `_clear`). `NIBKIT_MENU_VERSION` and `nib_menu_version()`,
+  `nib_menu_scale_for(w, h)`. `nib_menu_*` pictures are laid by their alpha, as nibkit's are.
+- `menu::scale_for(w, h)`: the pixels to a unit for a frame of any size (the 1024 × 768 screen
+  fitted in it), the one scale every app's drawing uses; a scale that isn't a number draws at
+  1, a tiny one at 0.05. `colour::EDGE`, a toast's edge.
+- `menu::raster`: `Canvas::blank(w, h, scale)`, a clear picture of its own size. A `Picture`
+  is laid over what is under it by its alpha (a transparent pixel was drawn black). Rounded
+  boxes and frames sample only the pixels their edge crosses: a states shelf draws in 1.7 ms
+  instead of 13.7, a menu page in 0.78 instead of 0.92 (a Mac, release build).
+
 ## 0.1.1
 
 - `paths::rom_roots` (nibOS) leaves the TF2 card's folders out when there is no card in the

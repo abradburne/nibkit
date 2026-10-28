@@ -6,6 +6,7 @@
 mod connections;
 mod options;
 mod system;
+mod toast;
 
 use nibkit::menu::raster::{Canvas, Fonts};
 use nibkit::menu::{layout, top, Card, Draw, Effect, Key, Menu, Row, Shelf, Slot, Status, Value};
@@ -468,15 +469,23 @@ pub unsafe extern "C" fn nib_menu_render(
 ///
 /// # Safety
 /// `rgba` is NULL or `w` × `h` × 4 bytes.
-unsafe fn picture<'a>(rgba: *const u8, w: c_int, h: c_int) -> Option<(&'a [u8], usize, usize)> {
+pub(crate) unsafe fn picture<'a>(
+    rgba: *const u8,
+    w: c_int,
+    h: c_int,
+) -> Option<(&'a [u8], usize, usize)> {
     let (w, h) = (w.max(0) as usize, h.max(0) as usize);
     // SAFETY: the caller's promise.
     (!rgba.is_null() && w > 0 && h > 0)
         .then(|| (unsafe { std::slice::from_raw_parts(rgba, w * h * 4) }, w, h))
 }
 
-fn size_out(c: &Canvas, width: *mut c_int, height: *mut c_int) {
-    // SAFETY: the callers pass on their callers' promise that these are NULL or writable.
+/// Writes `c`'s size where `width` and `height` point.
+///
+/// # Safety
+/// `width` and `height` are NULL or writable.
+unsafe fn size_out(c: &Canvas, width: *mut c_int, height: *mut c_int) {
+    // SAFETY: the caller's promise.
     unsafe {
         if let Some(w) = width.as_mut() {
             *w = c.w as c_int;
@@ -539,7 +548,8 @@ pub unsafe extern "C" fn nib_top_paused(
         fonts.width(s, size, bold)
     });
     c.draw(fonts, &paused, |_| None);
-    size_out(c, width, height);
+    // SAFETY: our caller's promise that `width` and `height` are NULL or writable.
+    unsafe { size_out(c, width, height) };
     c.px.as_ptr()
 }
 
@@ -589,7 +599,8 @@ pub unsafe extern "C" fn nib_top_state(
         fonts.width(s, size, bold)
     });
     c.draw(fonts, &state, |_| pic);
-    size_out(c, width, height);
+    // SAFETY: our caller's promise that `width` and `height` are NULL or writable.
+    unsafe { size_out(c, width, height) };
     c.px.as_ptr()
 }
 
@@ -680,7 +691,7 @@ mod tests {
             let values = [c("Today 4:41 PM"), c("1 h 23 min")];
             let lp: Vec<_> = labels.iter().map(|s| s.as_ptr()).collect();
             let vp: Vec<_> = values.iter().map(|s| s.as_ptr()).collect();
-            let shot = vec![90u8; 160 * 144 * 4];
+            let shot = [90u8, 90, 90, 255].repeat(160 * 144);
             let px = nib_top_state(
                 m,
                 shot.as_ptr(),

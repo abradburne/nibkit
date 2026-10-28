@@ -17,6 +17,10 @@
 //!   state's picture and details.
 //! - [`raster`] (feature `menu-raster`) draws the [`Draw`]s into an RGBA picture in Roboto
 //!   Condensed, the face DSlot uses, for an app with nothing of its own to draw text with.
+//! - [`toast`] (feature `menu-raster`) draws a toast over a game that is playing (an
+//!   achievement unlocked, a problem) and queues them, so they look and come and go the same
+//!   in every app.
+//! - [`scale_for`] says what scale a frame of any size is drawn at.
 //!
 //! ```
 //! use nibkit::menu::{layout, Menu, Row, Status, Value};
@@ -42,6 +46,8 @@ pub mod layout;
 mod model;
 #[cfg(feature = "menu-raster")]
 pub mod raster;
+#[cfg(feature = "menu-raster")]
+pub mod toast;
 pub mod top;
 
 pub use glyphs::Glyph;
@@ -53,6 +59,28 @@ pub use model::{Card, Menu, Row, Shelf, Slot, Status, Value};
 pub const W: f32 = 1024.0;
 /// That screen's height, in its units.
 pub const H: f32 = 768.0;
+
+/// The least scale anything is drawn at: below it, text is under a pixel tall.
+pub(crate) const LEAST_SCALE: f32 = 0.05;
+
+/// The pixels to a unit for a frame `w` × `h` pixels: the most at which the 1024 × 768 screen
+/// fits in it, keeping its shape (1 on the RG DS+'s panels, 2 in a 2048 × 1536 window, 0.25 on a
+/// 256 × 192 DS screen), never below 0.05. What to draw the menu, the top screen and a toast at
+/// for that frame.
+pub fn scale_for(w: usize, h: usize) -> f32 {
+    checked_scale((w as f32 / W).min(h as f32 / H))
+}
+
+/// `scale` as one to draw at: one that isn't a number (NaN, infinite) is 1, one below 0.05 is
+/// 0.05. Every scale an app gives nibkit's drawing goes through it, so a bad one is the same
+/// mistake wherever it is made.
+pub(crate) fn checked_scale(scale: f32) -> f32 {
+    if scale.is_finite() {
+        scale.max(LEAST_SCALE)
+    } else {
+        1.0
+    }
+}
 
 /// DSlot's colours.
 pub mod colour {
@@ -72,6 +100,32 @@ pub mod colour {
     pub const RED: Rgb = [236, 72, 92];
     /// The text on the selected tab.
     pub const TAB_INK: Rgb = [20, 23, 30];
+    /// The edge of a toast's panel.
+    pub const EDGE: Rgb = [52, 60, 80];
     /// Behind everything.
     pub const BLACK: Rgb = [0, 0, 0];
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_frames_scale_is_the_most_the_screen_fits_at() {
+        assert_eq!(scale_for(1024, 768), 1.0);
+        assert_eq!(scale_for(2048, 1536), 2.0);
+        assert_eq!(scale_for(256, 192), 0.25);
+        // A wide window: as tall as it is.
+        assert_eq!(scale_for(4096, 768), 1.0);
+        assert_eq!(scale_for(0, 0), LEAST_SCALE);
+    }
+
+    #[test]
+    fn a_bad_scale_is_one_and_a_tiny_one_the_least() {
+        assert_eq!(checked_scale(f32::NAN), 1.0);
+        assert_eq!(checked_scale(f32::INFINITY), 1.0);
+        assert_eq!(checked_scale(-2.0), LEAST_SCALE);
+        assert_eq!(checked_scale(0.01), LEAST_SCALE);
+        assert_eq!(checked_scale(1.5), 1.5);
+    }
 }

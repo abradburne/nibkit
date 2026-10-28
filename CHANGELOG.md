@@ -1,7 +1,35 @@
 # Changelog
 
-nibkit and nibkit-menu-c, which are released together. Until 0.1.0 they lived in nibOS's
-repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their history starts.
+nibkit, nibkit-menu-c and nib-cheevos, which are released together. Until 0.1.0 nibkit and
+nibkit-menu-c lived in nibOS's repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their
+history starts.
+
+## 0.2.0
+
+- **nib-cheevos**, a new crate (MIT): RetroAchievements for every nibOS emulator and DSlot, one
+  implementation through rcheevos 12.4 (vendored, once, in `nib-cheevos/rcheevos`; it was
+  inkdot's `inkdot-cheevos`, which it replaces). `client` (feature `client`): the `rc_client`
+  session driven once a frame, the console's memory read through the `Memory` trait, typed
+  `Event`s, `Settings { hardcore, encore, unofficial }`, the set's progress for save states, a
+  `curl` transport on a thread that tells rcheevos to retry anything but a request `curl`
+  could never make; `badges`, the shared badge cache filled on a thread. `hash` (features
+  `hash`, `zip`): rhash for a file or bytes, for every console by its `Roms/` folder name, one
+  table to rcheevos' console ids (`CONSOLES`), discs from a cue sheet or playlist, a zip as its
+  first entry with one of the console's extensions (`zip_member`); not CHD, nor Game & Watch
+  (rhash has neither). `api` (feature `api`): signing in, a game's sets
+  (`achievementsets`) and the player's unlocks, built and read by rcheevos' `rc_api_*`, every
+  answer checked the same way (a refused or expired token is `Error::Refused`, whichever
+  request), by `curl`. `launch`: `RA_TOKEN_FILE`, `RA_USERNAME`, `RA_HARDCORE`, the token file
+  (two lines, 0600, written whole), `Launch::from_env()`. `ua`: `user_agent(product, version,
+  core)` with rcheevos' clause. `paths`: the hosts, the badge cache (an absolute
+  `XDG_CACHE_HOME` only), `WARNING_ID` and `is_warning`. The feature `libretro` builds rcheevos'
+  `rc_libretro.c` too, against a `libretro.h` the program has (`LIBRETRO_INCLUDE_DIR`).
+- `dslot`: an emulator's description says where it earns RetroAchievements, `[achievements]
+  systems = [...]` (some of its `[systems]`; another is an error) and `hardcore` (default
+  false): `Emulator::achievements`, `Emulator::earns(system)`, and `Emulators::earning()`, the
+  systems the installed emulators earn in. DSlot passes the sign-in only to those.
+- A minor version: a crate is new, and `Emulator` has a field more. nibkit-menu-c:
+  `NIBKIT_MENU_VERSION` 200, the same calls.
 
 ## 0.1.4
 

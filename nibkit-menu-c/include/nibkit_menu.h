@@ -31,8 +31,8 @@
 extern "C" {
 #endif
 
-/* This header's version: major * 10000 + minor * 100 + patch (0.1.4). */
-#define NIBKIT_MENU_VERSION 104
+/* This header's version: major * 10000 + minor * 100 + patch (0.2.0). */
+#define NIBKIT_MENU_VERSION 200
 
 /* The library's version, as NIBKIT_MENU_VERSION in the header it was built with: a program
  * that uses a function added after the oldest library it supports checks it at run time. */

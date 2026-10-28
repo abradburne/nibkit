@@ -1,11 +1,11 @@
 [workspace]
-members = ["nibkit-menu-c"]
+members = ["nibkit-menu-c", "nib-cheevos"]
 # Dependencies resolved to versions that build with each crate's rust-version (1.87).
 resolver = "3"
 
 [package]
 name = "nibkit"
-version = "0.1.4"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.87"
 description = "What an app on a nibOS handheld needs to know and do: both screens, vblank, the buttons' names, touch, brightness, volume, where its files go, layered settings"

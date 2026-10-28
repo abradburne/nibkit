@@ -136,7 +136,7 @@ fn instant(clock: &mut Option<(u64, Instant)>, now_ms: u64) -> Instant {
 
 /// The version of the library: major × 10000 + minor × 100 + patch, as `NIBKIT_MENU_VERSION`
 /// in the header it was built with.
-pub const VERSION: c_int = 104;
+pub const VERSION: c_int = 200;
 
 #[no_mangle]
 pub extern "C" fn nib_menu_version() -> c_int {

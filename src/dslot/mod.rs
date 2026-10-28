@@ -40,6 +40,21 @@
 //! and the emulator's `default` holds. DSlot reads the file again when a game exits. Read it when
 //! the game starts and write it when an option changes; DSlot does not touch it meanwhile.
 //! What an emulator doesn't declare stays in its own files.
+//!
+//! An emulator that earns RetroAchievements says for which of its systems, and whether it may
+//! play them in hardcore:
+//!
+//! ```toml
+//! [achievements]
+//! systems = ["GB", "GBC"]   # where playing earns achievements (some of [systems])
+//! hardcore = false          # the default: Casual (softcore) only
+//! ```
+//!
+//! DSlot then hands a game of those systems the player's sign-in in its environment
+//! (`RA_TOKEN_FILE`, `RA_USERNAME`, `RA_HARDCORE`: nib-cheevos' `launch`), `RA_HARDCORE=1` only
+//! with `hardcore = true` (and only once DSlot offers hardcore at all), and none to a game of
+//! any other system; its Achievements page says which systems earn them
+//! ([`Emulators::earning`]). Without the table an emulator gets no sign-in.
 
 mod apps;
 mod launch;
@@ -92,6 +107,31 @@ struct Description {
     /// The only games it plays of a system, by the system: a file listing them.
     #[serde(default)]
     games: BTreeMap<String, PathBuf>,
+    /// Where it earns RetroAchievements.
+    #[serde(default)]
+    achievements: Option<AchievementsDecl>,
+}
+
+/// `[achievements]` as written.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AchievementsDecl {
+    #[serde(default)]
+    systems: Vec<String>,
+    #[serde(default)]
+    hardcore: bool,
+}
+
+/// Where an emulator earns RetroAchievements (`[achievements]`): the systems it plays that
+/// earn them, and whether it may play them in hardcore.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Achievements {
+    /// The systems, of those it is installed for, whose games earn achievements in it: they
+    /// get the player's sign-in when it starts them. Empty: none.
+    pub systems: Vec<String>,
+    /// It may play them in hardcore (`RA_HARDCORE=1` when the player chose hardcore); else
+    /// Casual (softcore) only.
+    pub hardcore: bool,
 }
 
 /// A game an emulator lists (`[games]`): what it is called and what it was.
@@ -365,6 +405,8 @@ pub struct Emulator {
     pub actions: Vec<Action>,
     /// The only games it plays of a system, where it lists them (`[games]`).
     games: Vec<(String, BTreeMap<String, Unit>)>,
+    /// Where it earns RetroAchievements (`[achievements]`).
+    pub achievements: Achievements,
 }
 
 impl Emulator {
@@ -405,10 +447,27 @@ impl Emulator {
         self.command(system).is_some()
     }
 
+    /// Whether playing `system`'s games in it earns RetroAchievements: it is installed for the
+    /// system and its `[achievements]` name it.
+    pub fn earns(&self, system: &str) -> bool {
+        self.plays(system) && self.achievements.systems.iter().any(|s| s == system)
+    }
+
     /// Reads a description: `None` for one that is not installed. `there` says whether a
     /// program (or a required file) is there.
     fn parse(id: &str, text: &str, there: &Probe) -> Result<Option<Emulator>, String> {
         let d: Description = toml::from_str(text).map_err(|e| e.to_string())?;
+        let achievements = d.achievements.unwrap_or(AchievementsDecl {
+            systems: Vec::new(),
+            hardcore: false,
+        });
+        if let Some(s) = achievements
+            .systems
+            .iter()
+            .find(|s| !d.systems.contains_key(s.as_str()))
+        {
+            return Err(format!("achievements: {s} is not one of its systems"));
+        }
         if !d.requires.iter().all(|f| (there.file)(f)) {
             return Ok(None);
         }
@@ -426,6 +485,14 @@ impl Emulator {
             return Ok(None);
         }
         let plays: Vec<String> = commands.iter().map(|(s, _)| s.clone()).collect();
+        let achievements = Achievements {
+            systems: achievements
+                .systems
+                .into_iter()
+                .filter(|s| plays.contains(s))
+                .collect(),
+            hardcore: achievements.hardcore,
+        };
         let options = d
             .options
             .into_iter()
@@ -468,6 +535,7 @@ impl Emulator {
             options,
             actions,
             games,
+            achievements,
         }))
     }
 }
@@ -579,6 +647,24 @@ impl Emulators {
             .and_then(|id| self.get(id))
             .filter(|e| e.takes(system, game))
             .or_else(|| self.all.iter().find(|e| e.takes(system, game)))
+    }
+
+    /// The systems whose games earn RetroAchievements in an emulator installed here
+    /// ([`Emulator::earns`]), sorted: what DSlot's Achievements page says playing earns them
+    /// in.
+    pub fn earning(&self) -> Vec<String> {
+        let set: std::collections::BTreeSet<&str> = self
+            .all
+            .iter()
+            .flat_map(|e| {
+                e.achievements
+                    .systems
+                    .iter()
+                    .filter(|s| e.plays(s))
+                    .map(String::as_str)
+            })
+            .collect();
+        set.into_iter().map(str::to_owned).collect()
     }
 
     /// What the first emulator that lists `game` of `system` calls it (`[games]`).
@@ -769,6 +855,50 @@ mod tests {
         assert_eq!(chosen("NDS", Some("mgba")), Some("dsperate"));
         assert_eq!(chosen("NDS", Some("gone")), Some("dsperate"));
         assert_eq!(chosen("GBC", None), None);
+    }
+
+    /// `[achievements]`: the systems it plays that earn them, hardcore only when it says so;
+    /// a system it doesn't play is a mistake; without the table, none.
+    #[test]
+    fn where_an_emulator_earns_achievements() {
+        let inkdot = r#"
+            name = "inkdot"
+            [systems]
+            GB = ["/usr/bin/inkdot", "{rom}"]
+            GBC = ["/usr/bin/inkdot", "{rom}"]
+            [achievements]
+            systems = ["GB", "GBC"]
+        "#;
+        let dsperate =
+            format!("{DSPERATE}\n[achievements]\nsystems = [\"NDS\"]\nhardcore = true\n");
+        let emulators = load(
+            &[("inkdot", inkdot), ("dsperate", &dsperate), ("mgba", MGBA)],
+            &[],
+        );
+        let ink = emulators.get("inkdot").unwrap();
+        assert!(ink.earns("GB") && ink.earns("GBC") && !ink.earns("NDS"));
+        assert!(!ink.achievements.hardcore, "Casual unless it says");
+        let ds = emulators.get("dsperate").unwrap();
+        assert!(ds.earns("NDS") && !ds.earns("GBA") && ds.achievements.hardcore);
+        let mgba = emulators.get("mgba").unwrap();
+        assert_eq!(mgba.achievements, Achievements::default());
+        assert!(!mgba.earns("GB"));
+        assert_eq!(emulators.earning(), ["GB", "GBC", "NDS"]);
+        // Not installed for a system: it earns nothing there.
+        let some = load(&[("dsperate", &dsperate)], &["/usr/bin/dsperate"]);
+        assert!(some.earning().is_empty());
+        let parse = |text: &str| Emulator::parse("x", text, &PROBE);
+        let wrong = "name = \"X\"\n[systems]\nGB = [\"/x\"]\n[achievements]\nsystems = [\"GBA\"]";
+        assert!(parse(wrong).unwrap_err().contains("GBA"));
+        let misspelt = "name = \"X\"\n[systems]\nGB = [\"/x\"]\n[achievements]\nsystem = [\"GB\"]";
+        assert!(parse(misspelt).is_err());
+        let empty = "name = \"X\"\n[systems]\nGB = [\"/x\"]\n[achievements]\n";
+        assert!(parse(empty)
+            .unwrap()
+            .unwrap()
+            .achievements
+            .systems
+            .is_empty());
     }
 
     #[test]

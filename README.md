@@ -15,9 +15,9 @@ instead of guessing.
 
 ```toml
 [dependencies]
-nibkit = "0.1"                                                         # nibOS; a desktop on macOS
-# nibkit = { version = "0.1", features = ["desktop"] }                 # a Linux desktop
-# nibkit = { version = "0.1", default-features = false, features = ["stock"] }  # the stock OS
+nibkit = "0.2"                                                         # nibOS; a desktop on macOS
+# nibkit = { version = "0.2", features = ["desktop"] }                 # a Linux desktop
+# nibkit = { version = "0.2", default-features = false, features = ["stock"] }  # the stock OS
 ```
 
 ## Features
@@ -40,6 +40,7 @@ Rust 1.87 or later.
 |---|---|
 | `nibkit` (this directory) | The Rust library. |
 | [`nibkit-menu-c`](nibkit-menu-c/README.md) | nibkit for C and C++ apps: the menu, the Connections page, DSlot's settings and an emulator's options, as a static library and `include/nibkit_menu.h`. |
+| [`nib-cheevos`](nib-cheevos/README.md) | RetroAchievements for nibOS's emulators and DSlot: rcheevos (vendored, MIT) for the session, every console's hash and the service's requests; the launcher's sign-in hand-over; `curl` as the transport. Needs a C compiler. |
 
 ## On a desktop
 

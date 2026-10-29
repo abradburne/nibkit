@@ -18,6 +18,14 @@ pub const TABS: (f32, f32, f32, f32) = (28.0, 10.0, 130.0, 40.0);
 pub const TAB_PAD: f32 = 16.0;
 /// A tab's label: its size, bold.
 const TAB_TEXT: f32 = 22.0;
+/// The sections under the tabs: the top of their labels' line, which starts at [`LEFT`].
+pub const SECTIONS_Y: f32 = 60.0;
+/// A section's label: its size, bold.
+const SECTION_TEXT: f32 = 20.0;
+/// The room between two sections' labels.
+pub const SECTION_GAP: f32 = 36.0;
+/// The title's line: its top, and its size, where there are no sections and where there are.
+const TITLE: [(f32, f32); 2] = [(72.0, 22.0), (100.0, 20.0)];
 /// Where labels start, in screen units.
 pub const LEFT: f32 = 150.0;
 /// Where values end, in screen units.
@@ -187,8 +195,8 @@ pub fn tab_widths<S: AsRef<str>>(labels: &[S]) -> Vec<f32> {
 
 /// The tab under a touch, of tabs labelled `labels` ([`tab_widths`]).
 pub fn tab_at<S: AsRef<str>>(x: f32, y: f32, labels: &[S]) -> Option<usize> {
-    let (tx, ty, _, h) = TABS;
-    if !(ty - 10.0..ty + h + 14.0).contains(&y) || x < tx || x >= W {
+    let (tx, ty, _, _) = TABS;
+    if !(ty - 10.0..SECTIONS_Y - 4.0).contains(&y) || x < tx || x >= W {
         return None;
     }
     let mut right = tx;
@@ -203,10 +211,37 @@ pub fn tab_at<S: AsRef<str>>(x: f32, y: f32, labels: &[S]) -> Option<usize> {
 pub fn tab_hit(x: f32, y: f32, n: usize) -> Option<usize> {
     let (tx, ty, w, h) = TABS;
     let inside = n > 0
-        && (ty - 10.0..ty + h + 14.0).contains(&y)
+        && (ty - 10.0..(ty + h + 14.0).min(SECTIONS_Y - 4.0)).contains(&y)
         && (tx..tx + n as f32 * w).contains(&x)
         && x < W;
     inside.then(|| (((x - tx) / w) as usize).min(n - 1))
+}
+
+/// Each section's label: where it starts and how wide it is, at the font size it is drawn at
+/// ([`estimate`], so that a tap finds the section drawn there whatever the font).
+fn section_spans<S: AsRef<str>>(labels: &[S]) -> Vec<(f32, f32)> {
+    let mut at = LEFT;
+    labels
+        .iter()
+        .map(|l| {
+            let w = estimate(l.as_ref(), SECTION_TEXT);
+            let span = (at, w);
+            at += w + SECTION_GAP;
+            span
+        })
+        .collect()
+}
+
+/// The section under a touch, of sections labelled `labels`: half the gap either side of a
+/// label is its own.
+pub fn section_at<S: AsRef<str>>(x: f32, y: f32, labels: &[S]) -> Option<usize> {
+    if !(SECTIONS_Y - 4.0..SECTIONS_Y + 40.0).contains(&y) {
+        return None;
+    }
+    let half = SECTION_GAP / 2.0;
+    section_spans(labels)
+        .into_iter()
+        .position(|(at, w)| (at - half..at + w + half).contains(&x))
 }
 
 fn text(s: &str, (size, bold): (f32, bool), (x, y): (f32, f32), anchor: f32, colour: Rgb) -> Draw {
@@ -241,6 +276,30 @@ fn tabs(out: &mut Vec<Draw>, tabs: &[(String, bool)]) {
             ink,
         ));
         at += w;
+    }
+}
+
+/// The sections under the tabs: the one on show white and underlined, the others dim.
+fn sections(out: &mut Vec<Draw>, sections: &[(String, bool)]) {
+    let labels: Vec<&str> = sections.iter().map(|(l, _)| l.as_str()).collect();
+    for ((label, on), (at, w)) in sections.iter().zip(section_spans(&labels)) {
+        let ink = if *on { colour::WHITE } else { colour::DIM };
+        out.push(text(
+            label,
+            (SECTION_TEXT, true),
+            (at, SECTIONS_Y),
+            0.0,
+            ink,
+        ));
+        if *on {
+            out.push(Draw::Rect {
+                x: at,
+                y: SECTIONS_Y + 28.0,
+                w,
+                h: 3.0,
+                colour: colour::WHITE,
+            });
+        }
     }
 }
 
@@ -298,10 +357,12 @@ pub fn menu_measured(
 ) -> Vec<Draw> {
     let mut out = Vec::new();
     tabs(&mut out, &m.tabs);
+    sections(&mut out, &m.sections);
+    let (title_y, title_size) = TITLE[usize::from(!m.sections.is_empty())];
     out.push(text(
         &m.title,
-        (22.0, true),
-        (LEFT, 72.0),
+        (title_size, true),
+        (LEFT, title_y),
         0.0,
         colour::FAINT,
     ));
@@ -643,6 +704,7 @@ mod tests {
     fn page(rows: Vec<Row>, row: usize) -> Menu {
         Menu {
             tabs: vec![("Play".into(), true), ("Game".into(), false)],
+            sections: Vec::new(),
             title: "TETRIS".into(),
             rows,
             row,
@@ -697,6 +759,33 @@ mod tests {
             .any(|d| matches!(d, Draw::Bar { y, .. } if *y == 672.0)));
     }
 
+    /// Sections go under the tabs, the one on show underlined; the title moves down under
+    /// them, clear of the first row's highlight.
+    #[test]
+    fn sections_sit_under_the_tabs() {
+        let mut m = page(vec![Row::new("Volume", Value::Slider(60))], 0);
+        m.sections = vec![("Shelf".into(), false), ("Sound".into(), true)];
+        let d = menu(&m, &Status::default());
+        let t = texts(&d);
+        assert!(t.contains(&("Shelf".into(), LEFT, SECTIONS_Y, colour::DIM)));
+        let sound = t.iter().find(|t| t.0 == "Sound").unwrap();
+        assert_eq!((sound.2, sound.3), (SECTIONS_Y, colour::WHITE));
+        let underline = d.iter().find_map(|d| match d {
+            Draw::Rect { x, y, w, h, colour } if *colour == colour::WHITE && *h == 3.0 => {
+                Some((*x, *y, *w))
+            }
+            _ => None,
+        });
+        assert_eq!(underline.map(|u| u.0), Some(sound.1));
+        let title = t.iter().find(|t| t.0 == "TETRIS").unwrap();
+        assert_eq!(title.2, 100.0);
+        assert!(title.2 + 24.0 < row_y(0) - ROW_STEP / 2.0 + 2.0);
+        // None: the title where it always was.
+        m.sections.clear();
+        let t = texts(&menu(&m, &Status::default()));
+        assert!(t.iter().any(|t| t.0 == "TETRIS" && t.2 == 72.0));
+    }
+
     #[test]
     fn a_long_page_scrolls_with_ellipses() {
         let rows = (0..14)
@@ -740,6 +829,23 @@ mod tests {
         assert_eq!(tab_at(20.0, 20.0, &labels), None);
         assert_eq!(tab_at(100.0, 100.0, &labels), None);
         assert_eq!(tab_at::<&str>(100.0, 20.0, &[]), None);
+        // The sections under them, from LEFT: a tap between two labels goes to the nearer.
+        let parts = ["Shelf", "Screen", "Sound"];
+        let spans = section_spans(&parts);
+        assert_eq!(spans[0].0, LEFT);
+        assert_eq!(section_at(LEFT + 5.0, SECTIONS_Y + 12.0, &parts), Some(0));
+        let between = spans[0].0 + spans[0].1 + SECTION_GAP / 2.0;
+        assert_eq!(section_at(between - 1.0, SECTIONS_Y, &parts), Some(0));
+        assert_eq!(section_at(between + 1.0, SECTIONS_Y, &parts), Some(1));
+        assert_eq!(section_at(spans[2].0 + 10.0, SECTIONS_Y, &parts), Some(2));
+        assert_eq!(
+            section_at(spans[2].0 + spans[2].1 + 40.0, SECTIONS_Y, &parts),
+            None
+        );
+        assert_eq!(section_at(LEFT + 5.0, 20.0, &parts), None);
+        assert_eq!(section_at(LEFT + 5.0, row_y(0), &parts), None);
+        // Tabs and sections don't share a touch.
+        assert_eq!(tab_at(30.0, SECTIONS_Y, &labels), None);
         let s = Shelf {
             cards: vec![
                 Card::resume(None, "r"),

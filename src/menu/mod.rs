@@ -4,8 +4,9 @@
 //! It is shared as a description of what to draw rather than a renderer, so each app keeps its
 //! own way of drawing (DSlot its SDL textures, an emulator its GL picture):
 //!
-//! - [`Menu`] and [`Shelf`] say what is on the screen: the tabs, the rows and their values, the
-//!   highlighted row, the hint line; or a shelf of cards (save states).
+//! - [`Menu`] and [`Shelf`] say what is on the screen: the tabs (and under them the page's
+//!   sections, where it has more than one), the rows and their values, the highlighted row, the
+//!   hint line; or a shelf of cards (save states).
 //! - [`layout::menu`] and [`layout::shelf`] turn that into [`Draw`]s, text and shapes placed on a
 //!   1024 × 768 screen in DSlot's sizes and colours ([`colour`]).
 //! - [`Menu::key`], [`Menu::touch`] (and the same on [`Shelf`]) move the highlight with the
@@ -29,6 +30,7 @@
 //! use nibkit::menu::{layout, Menu, Row, Status, Value};
 //! let menu = Menu {
 //!     tabs: vec![("Play".into(), true), ("States".into(), false)],
+//!     sections: Vec::new(),
 //!     title: "TETRIS".into(),
 //!     rows: vec![Row::new("Resume", Value::None), Row::new("Fast-forward", Value::Text("Off".into()))],
 //!     row: 0,

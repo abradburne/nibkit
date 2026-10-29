@@ -585,6 +585,7 @@ mod tests {
     fn a_page_draws_where_the_layout_says() {
         let m = Menu {
             tabs: vec![("Play".into(), true), ("Game".into(), false)],
+            sections: Vec::new(),
             title: "TETRIS".into(),
             rows: vec![
                 Row::new("Resume", Value::None),

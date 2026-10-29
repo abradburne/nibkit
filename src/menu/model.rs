@@ -5,7 +5,11 @@
 pub struct Menu {
     /// Each page's tab, and whether it is the page on show.
     pub tabs: Vec<(String, bool)>,
-    /// The line under the tabs: what the page is about (a game's name, a console's).
+    /// The parts of the page on show, under its tab, and whether each is the part on show:
+    /// none for a page all of one part.
+    pub sections: Vec<(String, bool)>,
+    /// The line under the tabs (and the sections): what the page is about (a game's name, a
+    /// console's).
     pub title: String,
     /// All the page's rows, on screen or not.
     pub rows: Vec<Row>,

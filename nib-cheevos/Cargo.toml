@@ -1,6 +1,6 @@
 [package]
 name = "nib-cheevos"
-version = "0.2.2"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.87"
 description = "RetroAchievements for nibOS's emulators and launcher: rcheevos (vendored, MIT) for the session, the hashes and the service's requests; the launcher's sign-in hand-over; curl as the transport"

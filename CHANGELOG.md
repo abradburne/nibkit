@@ -4,6 +4,16 @@ nibkit, nibkit-menu-c and nib-cheevos, which are released together. Until 0.1.0 
 nibkit-menu-c lived in nibOS's repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their
 history starts.
 
+## 0.3.0
+
+- **menu**: a page can be in sections, shown under the tabs: `Menu::sections` holds each one's
+  label and whether it is the one on show (empty for a page all of one part, as before). They
+  start at `layout::LEFT` on `layout::SECTIONS_Y`, the one on show white and underlined, the
+  others dim, and the title line moves down under them (100, at 20); `layout::section_at(x, y,
+  labels)` finds the one under a touch. A touch on the tabs now ends above the sections
+  (`tab_at` and `tab_hit` up to `SECTIONS_Y - 4`). `Menu` gains a field, so a `Menu { .. }`
+  written out in full needs `sections` too: the reason this is 0.3.0.
+
 ## 0.2.2
 
 - **menu**: a tab whose label is too long for its 130 is as wide as the label with 16 either

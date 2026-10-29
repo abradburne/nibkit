@@ -224,6 +224,7 @@ mod tests {
                 ("States".into(), false),
                 ("Game".into(), false),
             ],
+            sections: Vec::new(),
             title: String::new(),
             rows: vec![
                 Row::heading("LOOK"),

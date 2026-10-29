@@ -5,7 +5,7 @@ resolver = "3"
 
 [package]
 name = "nibkit"
-version = "0.2.2"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.87"
 description = "What an app on a nibOS handheld needs to know and do: both screens, vblank, the buttons' names, touch, brightness, volume, where its files go, layered settings"

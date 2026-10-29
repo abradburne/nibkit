@@ -591,7 +591,7 @@ dependencies = [
 
 [[package]]
 name = "nib-cheevos"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "cc",
  "chd",
@@ -601,7 +601,7 @@ dependencies = [
 
 [[package]]
 name = "nibkit"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "fontdue",
  "libc",
@@ -613,7 +613,7 @@ dependencies = [
 
 [[package]]
 name = "nibkit-menu-c"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "libc",
  "nibkit",

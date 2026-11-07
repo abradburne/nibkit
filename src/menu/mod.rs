@@ -24,6 +24,9 @@
 //! - [`indicators`] (feature `menu-raster`) keeps RetroAchievements' progress and challenge
 //!   indicators on screen while they last at the bottom left: the progress a panel in the
 //!   toast's style, each challenge its badge alone in a pulsing gold ring.
+//! - [`level`] (feature `menu-raster`) draws the indicator for a level the volume keys just
+//!   set (the volume, or Menu + volume's brightness, from [`crate::levels`]) at the bottom
+//!   right, fading away after a moment, the same over every app.
 //! - [`scale_for`] says what scale a frame of any size is drawn at.
 //!
 //! ```
@@ -50,6 +53,8 @@ mod input;
 pub mod keyboard;
 pub mod keys;
 pub mod layout;
+#[cfg(feature = "menu-raster")]
+pub mod level;
 mod model;
 #[cfg(feature = "menu-raster")]
 pub mod raster;

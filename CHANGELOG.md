@@ -4,6 +4,26 @@ nibkit, nibkit-menu-c and nib-cheevos, which are released together. Until 0.1.0 
 nibkit-menu-c lived in nibOS's repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their
 history starts.
 
+## 0.4.0
+
+- **levels** (new): what the volume keys just changed, for an indicator over whatever is on the
+  screens. nibOS's daemons announce each step of the volume (the volume keys) and of both
+  screens' brightness (Menu + volume) in `/run/nibos/osd/` (`levels::DIR`): a file named for what
+  changed (`volume`, `brightness`) holding the percent, written aside and renamed in. Only the
+  keys announce, so an app's own slider or a screensaver's dimming shows nothing.
+  `levels::watch()` gives a `LevelWatch` whose `changed()` (once a frame, never waits) is the
+  newest announced; `announce` / `announce_in` write one. `None` on the stock OS and a desktop.
+- **menu** `level` (with `menu-raster`): the indicator every app draws, a panel in the toast's
+  style at the bottom right (a speaker whose waves follow the volume, or a sun; a bar; the
+  percent). It shows for 1.5 s after the last press and fades over 0.5 s (`Indicator::tick` is
+  its opacity); `Indicator::lift` says how far up a toast in the same corner moves meanwhile,
+  `Indicator::faded` gives the picture with the opacity in its alpha.
+- **menu** `glyphs`: `Glyph::Speaker(waves)` and `Glyph::Sun`. `Glyph` gains variants, so a
+  `match` on it written out in full needs them too.
+- **nibkit-menu-c** 0.2.3 (`NIBKIT_MENU_VERSION` 203): `nib_levels_*`, the indicator for C and
+  C++: `new`, `tick` (a serial that changes with the picture, the fade's steps too), `render`
+  (RGBA, the opacity in its alpha, and where it goes), `lift`, `show`, `hide`, `watching`.
+
 ## 0.3.1
 
 - **nib-cheevos** `hash`: the PSP (`PSP`, rcheevos' console 41), its UMDs hashed by rhash's rule

@@ -70,6 +70,7 @@ pub const BATTERY: Option<(&str, &str)> = None;
 pub const BATTERY_PROTECT: Option<&[&str]> = None;
 pub const AMP_TUNING: Option<&str> = None;
 pub const VOLUME: bool = false;
+pub const LEVELS: Option<&str> = None;
 pub const NETWORK: Option<&str> = None;
 /// A computer's radios are its own business: `net` leaves them unknown.
 pub const RADIOS: bool = false;

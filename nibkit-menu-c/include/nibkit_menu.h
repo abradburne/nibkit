@@ -31,8 +31,8 @@
 extern "C" {
 #endif
 
-/* This header's version: major * 10000 + minor * 100 + patch (0.2.2). */
-#define NIBKIT_MENU_VERSION 202
+/* This header's version: major * 10000 + minor * 100 + patch (0.2.3). */
+#define NIBKIT_MENU_VERSION 203
 
 /* The library's version, as NIBKIT_MENU_VERSION in the header it was built with: a program
  * that uses a function added after the oldest library it supports checks it at run time. */
@@ -432,6 +432,55 @@ int nib_indicators_pulsing(const NibIndicators *i);
  * none. Valid until the next call on `i`. */
 const uint8_t *nib_indicators_render(NibIndicators *i, int frame_w, int frame_h, int *width,
                                      int *height, int *x, int *y);
+
+/* ---- The volume and brightness indicator (0.2.3) -------------------------------------------
+ *
+ * nibOS changes the volume (the volume keys) and both screens' brightness (Menu + volume) from
+ * anywhere, and announces each step; a NibLevels watches for that from when it is made, and
+ * shows the new level as a small panel at the bottom right (where a toast goes): a speaker or a
+ * sun, a bar filled to the level, the percent. It holds for 1.5 s after the last press, then
+ * fades away over 0.5 s. Only the keys announce: a level the app sets itself (a slider) shows
+ * only through nib_levels_show.
+ *
+ *     NibLevels *lv = nib_levels_new();
+ *     // once a frame:
+ *     uint64_t shown = nib_levels_tick(lv, now_ms);
+ *     if (shown != last) {                           // another level, or the fade's next step
+ *         int w, h, x, y;
+ *         const uint8_t *px = nib_levels_render(lv, frame_w, frame_h, &w, &h, &x, &y);
+ *         // px NULL: none; else lay it over the frame at (x, y) until it changes
+ *         last = shown;
+ *     }
+ *     // a toast on show sits nib_levels_lift(lv, frame_w, frame_h) pixels higher meanwhile
+ *
+ * The opacity is in the picture's alpha (32 steps); the panel is drawn (text rasterised, under
+ * a millisecond) when the level or the frame's size changes, and only faded otherwise. `now_ms`
+ * is any clock in milliseconds that keeps going while the game is paused. */
+typedef struct NibLevels NibLevels;
+
+enum {
+    NIB_LEVEL_VOLUME = 0,
+    NIB_LEVEL_BRIGHTNESS = 1
+};
+
+NibLevels *nib_levels_new(void);
+void nib_levels_free(NibLevels *l);
+/* 1 if nibOS's announcements are watched; 0 where there are none (the stock OS). */
+int nib_levels_watching(const NibLevels *l);
+/* Shows a level the app set itself (`what` NIB_LEVEL_*), from `now_ms`. */
+void nib_levels_show(NibLevels *l, int what, int percent, uint64_t now_ms);
+/* Takes in what nibOS announced; what is on show at `now_ms`: 0 for nothing, else a number
+ * that changes whenever the picture does. */
+uint64_t nib_levels_tick(NibLevels *l, uint64_t now_ms);
+/* The indicator as the last tick found it, for a `frame_w` x `frame_h` frame (RGBA, straight
+ * alpha, its opacity in the alpha), and where on it it goes; NULL for none. Valid until the
+ * next call on `l`. */
+const uint8_t *nib_levels_render(NibLevels *l, int frame_w, int frame_h, int *width,
+                                 int *height, int *x, int *y);
+/* How many pixels higher a toast goes while the indicator shows; 0 when it doesn't. */
+int nib_levels_lift(const NibLevels *l, int frame_w, int frame_h);
+/* Hides it at once (a menu opens over the game). */
+void nib_levels_hide(NibLevels *l);
 
 #ifdef __cplusplus
 }

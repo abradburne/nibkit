@@ -22,6 +22,10 @@ pub enum Glyph {
     Backspace(bool),
     /// An arrow key's arrow, which way it points; dark for a key lit white.
     Arrow(Dir, bool),
+    /// A speaker and its sound, in waves of 3 (the volume: 0 is silent).
+    Speaker(u8),
+    /// The sun: brightness.
+    Sun,
 }
 
 /// Which way an arrow points.
@@ -47,6 +51,8 @@ impl Glyph {
             Glyph::Battery(_) => 2.1,
             Glyph::Backspace(_) => 1.5,
             Glyph::Arrow(..) => 1.0,
+            Glyph::Speaker(_) => 1.3,
+            Glyph::Sun => 1.0,
         }
     }
 }
@@ -156,6 +162,38 @@ fn shade(glyph: Glyph, u: f32, v: f32) -> Option<bool> {
             let stem = (0.42..=0.58).contains(&u) && (0.45..=0.9).contains(&v);
             (head || stem).then_some(!dark)
         }
+        Glyph::Speaker(waves) => {
+            // A box, the cone opening to the right, and three arcs (as the signal's) from the
+            // cone's mouth, the first `waves` bright.
+            let off = (v - 0.5).abs();
+            let body = (0.06..0.3).contains(&u) && off < 0.15;
+            let cone = (0.26..0.58).contains(&u) && off <= 0.15 + (u - 0.26) / 0.32 * 0.29;
+            if body || cone {
+                return Some(true);
+            }
+            let (dx, dy) = (u - 0.58, v - 0.5);
+            let d = dx.hypot(dy);
+            (dx > 0.0 && dy.abs() <= dx * 1.1)
+                .then(|| {
+                    [(0.14, 0.24, 1), (0.32, 0.42, 2), (0.5, 0.6, 3)]
+                        .iter()
+                        .find(|(a, b, _)| (*a..*b).contains(&d))
+                        .map(|&(_, _, k)| k <= waves)
+                })
+                .flatten()
+        }
+        Glyph::Sun => {
+            // A disc, and eight rays round it.
+            let (dx, dy) = (u - 0.5, v - 0.5);
+            let r = dx.hypot(dy);
+            if r < 0.21 {
+                return Some(true);
+            }
+            let eighth = std::f32::consts::FRAC_PI_4;
+            let a = dy.atan2(dx);
+            let off = a - (a / eighth).round() * eighth;
+            ((0.31..0.47).contains(&r) && r * off.sin().abs() < 0.05).then_some(true)
+        }
     }
 }
 
@@ -185,6 +223,21 @@ mod tests {
     }
 
     #[test]
+    fn speaker_waves_lit_by_volume() {
+        let (on, off) = ([255, 255, 255], [80, 80, 80]);
+        let h = 40;
+        // On the middle line, in the outer wave.
+        let (x, y) = (((0.58 + 0.55) * 40.0) as usize, 20);
+        let (w, quiet) = render(Glyph::Speaker(1), h, on, off);
+        assert_eq!(w, 52);
+        assert_eq!(&quiet[(y * w + x) * 4..][..3], &off);
+        let (_, loud) = render(Glyph::Speaker(3), h, on, off);
+        assert_eq!(&loud[(y * w + x) * 4..][..3], &on);
+        // The cone is always lit.
+        assert_eq!(&quiet[(y * w + 16) * 4..][..4], &[255, 255, 255, 255]);
+    }
+
+    #[test]
     fn lock_and_check_have_ink() {
         for g in [
             Glyph::Lock,
@@ -193,6 +246,8 @@ mod tests {
             Glyph::Backspace(true),
             Glyph::Arrow(Dir::Up, false),
             Glyph::Arrow(Dir::Left, true),
+            Glyph::Speaker(2),
+            Glyph::Sun,
         ] {
             let (w, px) = render(g, 30, [255; 3], [0; 3]);
             assert!(px.chunks(4).any(|p| p[3] == 255), "{g:?}");

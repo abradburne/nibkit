@@ -94,7 +94,7 @@ unsafe fn fill(t: *mut NibToast, f: impl FnOnce(Notice) -> Notice) {
 }
 
 /// A frame's size from C: negative is 0.
-fn dim(v: c_int) -> usize {
+pub(crate) fn dim(v: c_int) -> usize {
     v.max(0) as usize
 }
 
@@ -102,7 +102,7 @@ fn dim(v: c_int) -> usize {
 ///
 /// # Safety
 /// `out` is NULL or writable.
-unsafe fn put(out: *mut c_int, v: usize) {
+pub(crate) unsafe fn put(out: *mut c_int, v: usize) {
     // SAFETY: the caller's promise.
     if let Some(o) = unsafe { out.as_mut() } {
         *o = v as c_int;
@@ -129,14 +129,14 @@ unsafe fn hand_over(
 }
 
 /// The caller's `now_ms` on a clock that started at its first time (`clock`) as an instant.
-fn instant(clock: &mut Option<(u64, Instant)>, now_ms: u64) -> Instant {
+pub(crate) fn instant(clock: &mut Option<(u64, Instant)>, now_ms: u64) -> Instant {
     let (first, then) = *clock.get_or_insert((now_ms, Instant::now()));
     then + Duration::from_millis(now_ms.saturating_sub(first))
 }
 
 /// The version of the library: major × 10000 + minor × 100 + patch, as `NIBKIT_MENU_VERSION`
 /// in the header it was built with.
-pub const VERSION: c_int = 202;
+pub const VERSION: c_int = 203;
 
 #[no_mangle]
 pub extern "C" fn nib_menu_version() -> c_int {

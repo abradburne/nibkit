@@ -4,6 +4,7 @@
 //! battery and the volume (`system`).
 
 mod connections;
+mod level;
 mod options;
 mod system;
 mod toast;

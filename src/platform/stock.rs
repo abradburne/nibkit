@@ -68,6 +68,7 @@ pub const BATTERY: Option<(&str, &str)> = None;
 pub const BATTERY_PROTECT: Option<&[&str]> = None;
 pub const AMP_TUNING: Option<&str> = None;
 pub const VOLUME: bool = false;
+pub const LEVELS: Option<&str> = None;
 pub const NETWORK: Option<&str> = None;
 /// The stock OS says nothing `net` can read about its radios.
 pub const RADIOS: bool = false;

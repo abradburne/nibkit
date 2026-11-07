@@ -27,6 +27,8 @@ pub mod badges;
 mod chd;
 #[cfg(feature = "client")]
 pub mod client;
+#[cfg(feature = "cso")]
+mod cso;
 mod ffi;
 #[cfg(feature = "hash")]
 pub mod hash;

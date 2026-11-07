@@ -10,15 +10,15 @@ messages: each app words what happens itself.
 |---|---|---|
 | `client` | `client` | An emulator's session, driven once per emulated frame: signed in with the launcher's token, the game's set loaded by its hash and evaluated against the machine's memory (the `Memory` trait, in the service's address space for the console), what happens as typed `Event`s (unlocks, progress and challenge indicators, leaderboards, the game completed, the service failing), the set's progress kept in save states, `Settings { hardcore, encore, unofficial }`. Requests go out on a thread of their own; a request `curl` could never make is not retried, anything else is, holding an unlock until it is sent. |
 | `badges` | `client` | The badges' pictures, fetched into the cache every app shares. |
-| `hash` | `hash`, `zip`, `chd` | A game's identity, by rhash, for every console nibOS plays, named as the `Roms/` folders are (`NDS`, `GBA`, `GB`, `GBC`, `SFC`, `FC`, `FDS`, `MD`, `SMS`, `GG`, `SG1000`, `LYNX`, `NGP`, `PCE`, `PCECD`, `PS`, `WS`, `GW`) with rcheevos' console id for each; a file or bytes; a disc from its cue sheet or playlist; with `zip`, a zip is its first entry with one of the console's extensions; with `chd`, a CHD disc image, read by a CD reader over the `chd` crate (BSD-3-Clause). |
+| `hash` | `hash`, `zip`, `chd` | A game's identity, by rhash, for every console nibOS plays, named as the `Roms/` folders are (`NDS`, `GBA`, `GB`, `GBC`, `SFC`, `FC`, `FDS`, `MD`, `SMS`, `GG`, `SG1000`, `LYNX`, `NGP`, `PCE`, `PCECD`, `PS`, `PSP`, `WS`, `GW`) with rcheevos' console id for each; a file or bytes; a disc from its cue sheet or playlist, a PSP UMD from its ISO or EBOOT.PBP; with `zip`, a zip is its first entry with one of the console's extensions; with `chd`, a CHD disc image (a CD's tracks, or a PSP UMD's DVD image), read by a CD reader over the `chd` crate (BSD-3-Clause); with `cso`, a PSP UMD's CSO image (version 0 and 1, deflated), read by one over `miniz_oxide`. |
 | `api` | `api` | What a launcher asks outside a game: signing in, a game's sets by its hash, the player's unlocks, a badge; built and read by rcheevos' `rc_api_*`, every answer checked the same way (a refused or expired token is `Error::Refused`, whichever request). |
 | `libretro` | `libretro` | For a program that runs libretro cores, by rcheevos' `rc_libretro.c`: `Regions`, the console's memory in the service's address space over the core's own (its memory map, `RETRO_ENVIRONMENT_SET_MEMORY_MAPS`, or else its memory ids), with rcheevos' quirks for each console, read in place and a `Memory` for the session; `disallowed_settings(core).allows(key, value)` and `system_allowed(core, console)`, rcheevos' rules for a core's options and consoles. |
 | `launch` | | The sign-in from DSlot to the game: `RA_TOKEN_FILE`, `RA_USERNAME`, `RA_HARDCORE`, the token file (two lines, the username then the token, 0600, written whole or not at all), `Launch::from_env()`. |
 | `ua` | | The User-Agent: `user_agent("inkdot", "0.1.0", None)` is `inkdot/0.1.0 (nibOS; linux aarch64) rcheevos/12.4`. |
 | `paths` | | The service's hosts, the badge cache (`$XDG_CACHE_HOME/retroachievements/badges` for an absolute `XDG_CACHE_HOME`, else `~/.cache/...`), `WARNING_ID` and `is_warning` for the service's "Unknown Emulator" entries. |
 
-`client`, `hash`, `zip` and `api` are on by default; `chd` (CHD disc images) and `libretro` are
-asked for. An emulator takes `client` and `hash`, a launcher `zip` (with `hash`) and `api`, and
+`client`, `hash`, `zip` and `api` are on by default; `chd` (CHD disc images), `cso` (CSO images)
+and `libretro` are asked for. An emulator takes `client` and `hash`, a launcher `zip` (with `hash`) and `api`, and
 either `chd` where it plays discs:
 
 ```toml

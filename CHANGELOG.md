@@ -4,6 +4,15 @@ nibkit, nibkit-menu-c and nib-cheevos, which are released together. Until 0.1.0 
 nibkit-menu-c lived in nibOS's repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their
 history starts.
 
+## Unreleased
+
+- **nib-cheevos** `hash`: the PSP (`PSP`, rcheevos' console 41), its UMDs hashed by rhash's rule
+  (the game's `PARAM.SFO` and `EBOOT.BIN`) from an ISO, and a PSN download's `EBOOT.PBP` whole.
+  With `chd`, a UMD's DVD image (`chdman createdvd`: no track entries, 2048-byte units) is one
+  data track. A new feature, `cso`, reads CSO images (version 0 and 1, deflated blocks) for rhash
+  through a reader of its own over `miniz_oxide`. Tests: a UMD built by hand hashes the same as
+  an ISO and a CSO; a CSO's stored and deflated blocks, and the short last one, read back.
+
 ## 0.3.0
 
 - **menu**: a page can be in sections, shown under the tabs: `Menu::sections` holds each one's

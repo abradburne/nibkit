@@ -6,8 +6,8 @@
 //! them.
 //!
 //! Consoles are named as nibOS's `Roms/` folders are ([`CONSOLES`]: `NDS`, `GBA`, `GB`, `GBC`,
-//! `SFC`, `FC`, `FDS`, `MD`, `SMS`, `GG`, `SG1000`, `LYNX`, `NGP`, `PCE`, `PCECD`, `PS`, `WS`,
-//! `GW`), and each is one of rcheevos' `RC_CONSOLE_*` ids.
+//! `SFC`, `FC`, `FDS`, `MD`, `SMS`, `GG`, `SG1000`, `LYNX`, `NGP`, `PCE`, `PCECD`, `PS`, `PSP`,
+//! `WS`, `GW`), and each is one of rcheevos' `RC_CONSOLE_*` ids.
 //!
 //! A zipped game is the ROM inside it: the first entry, in the zip's order, with one of the
 //! console's extensions ([`zip_member`]), unpacked into memory (at most rhash's 64 MiB) and hashed
@@ -16,7 +16,8 @@
 //!
 //! A CHD disc image (or a playlist whose first disc is one) is read through a CD reader of
 //! nib-cheevos' own over the `chd` crate, with the feature `chd`; without it, it is an
-//! [`Error::Unsupported`]. Not yet: Game & Watch units, which rhash 12.4 has no rule for (an
+//! [`Error::Unsupported`]. A CSO image (a PSP game's) is read through one of its own, with the
+//! feature `cso`. Not yet: Game & Watch units, which rhash 12.4 has no rule for (an
 //! [`Error::Unsupported`] too).
 
 use crate::ffi;
@@ -100,6 +101,14 @@ pub const CONSOLES: &[Console] = &[
         extensions: &["cue", "chd", "m3u", "pbp"],
         disc: true,
     },
+    // A UMD: an ISO, or one compressed (CSO, CHD), or a PSN download (an EBOOT.PBP).
+    Console {
+        system: "PSP",
+        id: 41,
+        name: "PlayStation Portable",
+        extensions: &["iso", "cso", "chd", "pbp"],
+        disc: true,
+    },
     cart("WS", 53, "WonderSwan", &["ws", "wsc"]),
     cart("GW", 60, "Game & Watch", &["mgw"]),
 ];
@@ -160,6 +169,9 @@ pub fn file(system: &str, path: &Path) -> Result<String, Error> {
     if ext == "chd" || (ext == "m3u" && first_disc_is_chd(path)) {
         return chd(console, path);
     }
+    if ext == "cso" {
+        return cso(console, path);
+    }
     if ext == "zip" {
         if console.disc {
             return Err(Error::Unsupported("a zipped disc".into()));
@@ -202,6 +214,43 @@ fn chd(console: &Console, path: &Path) -> Result<String, Error> {
             )
         }
     })
+}
+
+/// A CSO image's hash (feature `cso`): rhash reads it through the reader in `src/cso.rs`, as
+/// it reads the same disc as an ISO.
+#[cfg(feature = "cso")]
+fn cso(console: &Console, path: &Path) -> Result<String, Error> {
+    if !console.disc {
+        return Err(Error::Unsupported(format!(
+            "a CSO of a {} game",
+            console.name
+        )));
+    }
+    let c_path = CString::new(path.to_string_lossy().as_bytes())
+        .map_err(|_| Error::Read(format!("{}: a NUL in the path", path.display())))?;
+    rhash(|out, log, ud| {
+        // SAFETY: `out` has 33 bytes; the path is NUL-terminated and the reader static, both
+        // valid for the call; the log callback and its `ud` are valid for the call.
+        unsafe {
+            ffi::nib_rc_hash_disc(
+                out,
+                console.id,
+                c_path.as_ptr(),
+                &crate::cso::READER,
+                log,
+                0,
+                ud,
+            )
+        }
+    })
+}
+
+/// Without the CSO reader, a CSO isn't hashed.
+#[cfg(not(feature = "cso"))]
+fn cso(_: &Console, _: &Path) -> Result<String, Error> {
+    Err(Error::Unsupported(
+        "CSO images (nib-cheevos' feature `cso`)".into(),
+    ))
 }
 
 /// Without the CHD reader, a CHD isn't hashed.
@@ -344,6 +393,61 @@ mod tests {
         buffer("GBA", "x.gba", data).unwrap()
     }
 
+    /// A PSP UMD as an ISO: its volume descriptor, the root, `PSP_GAME`, `PSP_GAME\\SYSDIR`,
+    /// then `PARAM.SFO` and `EBOOT.BIN`, one sector each.
+    fn umd(sfo: &[u8], eboot: &[u8]) -> Vec<u8> {
+        const S: usize = 2048;
+        let mut iso = vec![0u8; S * 23];
+        let record = |iso: &mut Vec<u8>, at: usize, name: &[u8], extent: u32, size: u32| {
+            let len = 33 + name.len() + (name.len() + 1) % 2;
+            let r = &mut iso[at..at + len];
+            r[0] = len as u8;
+            r[2..6].copy_from_slice(&extent.to_le_bytes());
+            r[6..10].copy_from_slice(&extent.to_be_bytes());
+            r[10..14].copy_from_slice(&size.to_le_bytes());
+            r[14..18].copy_from_slice(&size.to_be_bytes());
+            r[32] = name.len() as u8;
+            r[33..33 + name.len()].copy_from_slice(name);
+            len
+        };
+        let pvd = 16 * S;
+        iso[pvd] = 1;
+        iso[pvd + 1..pvd + 6].copy_from_slice(b"CD001");
+        iso[pvd + 6] = 1;
+        iso[pvd + 128..pvd + 130].copy_from_slice(&2048u16.to_le_bytes());
+        record(&mut iso, pvd + 156, &[0], 18, S as u32);
+        record(&mut iso, 18 * S, b"PSP_GAME", 19, S as u32);
+        let n = record(&mut iso, 19 * S, b"PARAM.SFO;1", 21, sfo.len() as u32);
+        record(&mut iso, 19 * S + n, b"SYSDIR", 20, S as u32);
+        record(&mut iso, 20 * S, b"EBOOT.BIN;1", 22, eboot.len() as u32);
+        iso[21 * S..21 * S + sfo.len()].copy_from_slice(sfo);
+        iso[22 * S..22 * S + eboot.len()].copy_from_slice(eboot);
+        iso
+    }
+
+    /// A PSP game is its PARAM.SFO and its EBOOT.BIN, one after the other, whether its UMD is an
+    /// ISO or a CSO; an EBOOT.PBP is the whole file.
+    #[test]
+    fn psp_umds_hash_by_their_param_sfo_and_eboot() {
+        let dir = temp("psp");
+        let (sfo, eboot) = (b"\0PSF params of the game".as_slice(), [0x7Fu8; 1500]);
+        let iso = dir.join("Game.iso");
+        std::fs::write(&iso, umd(sfo, &eboot)).unwrap();
+        let want = md5(&[sfo, &eboot[..]].concat());
+        assert_eq!(file("PSP", &iso).unwrap(), want);
+        #[cfg(feature = "cso")]
+        {
+            let cso = dir.join("Game.cso");
+            std::fs::write(&cso, crate::cso::tests::cso_of(&umd(sfo, &eboot), 2)).unwrap();
+            assert_eq!(file("PSP", &cso).unwrap(), want);
+        }
+        let pbp = dir.join("EBOOT.PBP");
+        std::fs::write(&pbp, b"\0PBP and the rest").unwrap();
+        assert_eq!(file("PSP", &pbp).unwrap(), md5(b"\0PBP and the rest"));
+        assert!(file("PSP", &dir.join("Game.zip")).is_err());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
     fn temp(name: &str) -> std::path::PathBuf {
         let dir =
             std::env::temp_dir().join(format!("nib-cheevos-hash-{name}-{}", std::process::id()));
@@ -376,14 +480,14 @@ mod tests {
             systems,
             [
                 "NDS", "GBA", "GB", "GBC", "SFC", "FC", "FDS", "MD", "SMS", "GG", "SG1000", "LYNX",
-                "NGP", "PCE", "PCECD", "PS", "WS", "GW"
+                "NGP", "PCE", "PCECD", "PS", "PSP", "WS", "GW"
             ]
         );
         // include/rc_consoles.h's numbers.
         let ids: Vec<u32> = CONSOLES.iter().map(|c| c.id).collect();
         assert_eq!(
             ids,
-            [18, 5, 4, 6, 3, 7, 81, 1, 11, 15, 33, 13, 14, 8, 76, 12, 53, 60]
+            [18, 5, 4, 6, 3, 7, 81, 1, 11, 15, 33, 13, 14, 8, 76, 12, 41, 53, 60]
         );
         assert_eq!(console_id("sfc"), Some(3));
         assert_eq!(console_id("PORTS"), None);

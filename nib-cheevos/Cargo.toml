@@ -31,6 +31,9 @@ api = []
 # CHD disc images hashed (`hash::file` on a .chd, or a playlist whose first disc is one): a CD
 # reader for rhash over the `chd` crate (BSD-3-Clause), which decompresses them.
 chd = ["hash", "dep:chd"]
+# CSO images (a PSP game's) hashed (`hash::file` on a .cso): a reader for rhash that inflates
+# their blocks.
+cso = ["hash", "dep:miniz_oxide"]
 # rcheevos' rc_libretro.c (memory maps of libretro cores, the settings and systems it allows
 # for a core): needs LIBRETRO_INCLUDE_DIR, the folder with libretro.h (build.rs).
 libretro = []
@@ -41,6 +44,8 @@ libc = "0.2"
 zip = { version = "2.4.2", default-features = false, features = ["deflate-miniz"], optional = true }
 # A CHD's hunks, decompressed (`chd`).
 chd = { version = "0.3", optional = true }
+# A CSO's deflated blocks (`cso`).
+miniz_oxide = { version = "0.8", optional = true }
 
 [build-dependencies]
 cc = "1"

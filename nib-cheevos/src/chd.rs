@@ -13,6 +13,9 @@
 //! read is its user data (2048 bytes of a data sector, after its sync and header), as rhash's own
 //! reader gives it.
 //!
+//! A DVD in a CHD (a PSP game's UMD, made with `chdman createdvd`) has no track entries: it is
+//! one data track of 2048-byte sectors, the image's units, numbered from 0.
+//!
 //! Not here: a CHD that needs a parent image (a delta), and GD-ROMs (no console nibOS plays).
 
 use chd::metadata::{KnownMetadata, Metadata};
@@ -23,6 +26,10 @@ use std::io::BufReader;
 
 /// A CD frame in a CHD: the sector and its subcode.
 const FRAME: usize = 2352 + 96;
+/// A DVD's sector in a CHD: its 2048 bytes of user data, nothing else.
+const DVD_SECTOR: usize = 2048;
+/// The metadata tag of a DVD image (`chdman createdvd`).
+const DVD_TAG: u32 = u32::from_be_bytes(*b"DVD ");
 /// Every track's frames are padded to a multiple of this in a CHD.
 const PADDING: u32 = 4;
 /// rhash's special track numbers (`RC_HASH_CDTRACK_*`).
@@ -104,6 +111,23 @@ fn layout(entries: &[String]) -> Vec<TrackInfo> {
     tracks
 }
 
+/// A DVD image's one track, of `bytes` bytes of 2048-byte sectors, if it is the one rhash asks
+/// for (the first, the first data track, the last or the largest: all the same one).
+fn dvd_track(bytes: u64, track: u32) -> Option<TrackInfo> {
+    if track != 1 && track < LARGEST {
+        return None;
+    }
+    let frames = u32::try_from(bytes / DVD_SECTOR as u64).ok()?;
+    (frames > 0).then(|| TrackInfo {
+        number: 1,
+        kind: "DVD".into(),
+        frames,
+        pregap: 0,
+        first_frame: 0,
+        first_sector: 0,
+    })
+}
+
 /// The track rhash asks for: a number, or one of its special ones.
 fn pick(tracks: &[TrackInfo], track: u32) -> Option<&TrackInfo> {
     match track {
@@ -118,6 +142,8 @@ fn pick(tracks: &[TrackInfo], track: u32) -> Option<&TrackInfo> {
 struct Track {
     chd: Chd<BufReader<File>>,
     info: TrackInfo,
+    /// A frame's bytes in the image: a CD's sector and subcode, or a DVD's sector.
+    frame_bytes: usize,
     frames_per_hunk: u32,
     hunk: Option<u32>,
     data: Vec<u8>,
@@ -128,8 +154,9 @@ impl Track {
     fn open(path: &str, track: u32) -> Option<Track> {
         let file = BufReader::new(File::open(path).ok()?);
         let mut chd = Chd::open(file, None).ok()?;
-        let entries: Vec<String> = Vec::<Metadata>::try_from(chd.metadata_refs())
-            .ok()?
+        let metadata = Vec::<Metadata>::try_from(chd.metadata_refs()).ok()?;
+        let dvd = metadata.iter().any(|m| m.metatag == DVD_TAG);
+        let entries: Vec<String> = metadata
             .into_iter()
             .filter(|m| {
                 m.metatag == KnownMetadata::CdRomTrack2 as u32
@@ -141,9 +168,14 @@ impl Track {
                     .to_owned()
             })
             .collect();
-        let info = pick(&layout(&entries), track)?.clone();
         let hunk_bytes = chd.header().hunk_size() as usize;
-        let frames_per_hunk = (hunk_bytes / FRAME) as u32;
+        let (info, frame_bytes) =
+            if entries.is_empty() && (dvd || chd.header().unit_bytes() as usize == DVD_SECTOR) {
+                (dvd_track(chd.header().logical_bytes(), track)?, DVD_SECTOR)
+            } else {
+                (pick(&layout(&entries), track)?.clone(), FRAME)
+            };
+        let frames_per_hunk = (hunk_bytes / frame_bytes) as u32;
         if frames_per_hunk == 0 {
             return None;
         }
@@ -151,6 +183,7 @@ impl Track {
             data: vec![0; hunk_bytes],
             chd,
             info,
+            frame_bytes,
             frames_per_hunk,
             hunk: None,
             compressed: Vec::new(),
@@ -174,8 +207,9 @@ impl Track {
                 .ok()?;
             self.hunk = Some(hunk);
         }
-        let at = (frame % self.frames_per_hunk) as usize * FRAME;
-        self.data.get(at..at + 2352)
+        let at = (frame % self.frames_per_hunk) as usize * self.frame_bytes;
+        let sector_bytes = self.frame_bytes.min(2352);
+        self.data.get(at..at + sector_bytes)
     }
 
     /// Up to `buf.len()` bytes of user data from sector `sector` on: how many.
@@ -292,6 +326,19 @@ mod tests {
             (20, 0, (0, 2048))
         );
         assert!(layout(&["garbage".into()]).is_empty());
+    }
+
+    /// A PSP game's DVD image: one track of cooked sectors, whichever rhash asks for.
+    #[test]
+    fn a_dvd_is_one_data_track() {
+        let t = dvd_track(2048 * 100, FIRST_DATA).unwrap();
+        assert_eq!(
+            (t.number, t.frames, t.first_sector, t.data()),
+            (1, 100, 0, (0, 2048))
+        );
+        assert!(dvd_track(2048 * 100, 1).is_some() && dvd_track(2048 * 100, LAST).is_some());
+        assert!(dvd_track(2048 * 100, 2).is_none());
+        assert!(dvd_track(0, 1).is_none());
     }
 
     #[test]

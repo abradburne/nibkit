@@ -4,7 +4,7 @@ nibkit, nibkit-menu-c and nib-cheevos, which are released together. Until 0.1.0 
 nibkit-menu-c lived in nibOS's repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their
 history starts.
 
-## Unreleased
+## 0.3.1
 
 - **nib-cheevos** `hash`: the PSP (`PSP`, rcheevos' console 41), its UMDs hashed by rhash's rule
   (the game's `PARAM.SFO` and `EBOOT.BIN`) from an ISO, and a PSN download's `EBOOT.PBP` whole.

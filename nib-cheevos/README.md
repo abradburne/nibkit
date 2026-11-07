@@ -22,14 +22,14 @@ and `libretro` are asked for. An emulator takes `client` and `hash`, a launcher 
 either `chd` where it plays discs:
 
 ```toml
-nib-cheevos = { git = "https://github.com/abradburne/nibkit", tag = "v0.3.0", default-features = false, features = ["client", "hash"] }
-nib-cheevos = { git = "https://github.com/abradburne/nibkit", tag = "v0.3.0", default-features = false, features = ["zip", "api"] }
+nib-cheevos = { git = "https://github.com/abradburne/nibkit", tag = "v0.3.1", default-features = false, features = ["client", "hash"] }
+nib-cheevos = { git = "https://github.com/abradburne/nibkit", tag = "v0.3.1", default-features = false, features = ["zip", "api"] }
 ```
 
 An emulator built on libretro cores adds `libretro`:
 
 ```toml
-nib-cheevos = { git = "https://github.com/abradburne/nibkit", tag = "v0.3.0", default-features = false, features = ["client", "hash", "zip", "libretro"] }
+nib-cheevos = { git = "https://github.com/abradburne/nibkit", tag = "v0.3.1", default-features = false, features = ["client", "hash", "zip", "libretro"] }
 ```
 
 rcheevos is C: building needs a C compiler. With the feature `libretro`, rcheevos'

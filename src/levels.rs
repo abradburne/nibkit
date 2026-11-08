@@ -48,6 +48,7 @@ impl What {
         }
     }
 
+    #[cfg(target_os = "linux")]
     fn from_file(name: &[u8]) -> Option<What> {
         [What::Volume, What::Brightness]
             .into_iter()

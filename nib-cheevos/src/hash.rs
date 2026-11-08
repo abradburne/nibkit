@@ -326,11 +326,14 @@ fn zipped(console: &Console, path: &Path) -> Result<String, Error> {
     let mut zip = zip::ZipArchive::new(std::io::BufReader::new(file)).map_err(|e| read(&e))?;
     // In the order they were written (the central directory's).
     let names: Vec<String> = (0..zip.len())
-        .map(|i| zip.name_for_index(i).unwrap_or_default().to_owned())
+        .map(|i| match zip.name_for_index(i) {
+            Some(Ok(name)) => name.into_owned(),
+            _ => String::new(),
+        })
         .collect();
     let at = zip_member(console.system, names.iter().map(String::as_str)).ok_or(Error::NoRom)?;
     let mut entry = zip.by_index(at).map_err(|e| read(&e))?;
-    let name = entry.name().to_owned();
+    let name = entry.name().map_err(|e| read(&e))?.into_owned();
     let mut data = Vec::with_capacity(entry.size().min(MOST) as usize);
     (&mut entry)
         .take(MOST)

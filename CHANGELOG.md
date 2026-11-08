@@ -4,6 +4,16 @@ nibkit, nibkit-menu-c and nib-cheevos, which are released together. Until 0.1.0 
 nibkit-menu-c lived in nibOS's repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their
 history starts.
 
+## 0.4.1
+
+- **nib-cheevos** `zip`: the zip reader is zip 9.4 (from 2.6), which fixes the zip crate's
+  advisories: a parser differential between the local and central headers ("zip cloaking"), an
+  AES entry's HMAC check skipped at an early end of file, and unbounded symlink targets. nibkit
+  only reads a zipped ROM into memory, never extracts to disk. Deflate now goes through flate2's
+  zlib-rs backend (pure Rust), named in the feature, rather than `deflate-miniz`.
+- **levels**: `What::from_file` is built only on Linux, where the watcher uses it (a dead-code
+  warning on macOS).
+
 ## 0.4.0
 
 - **levels** (new): what the volume keys just changed, for an indicator over whatever is on the

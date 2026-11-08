@@ -1,6 +1,6 @@
 [package]
 name = "nib-cheevos"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 rust-version = "1.87"
 description = "RetroAchievements for nibOS's emulators and launcher: rcheevos (vendored, MIT) for the session, the hashes and the service's requests; the launcher's sign-in hand-over; curl as the transport"
@@ -41,7 +41,7 @@ libretro = []
 [dependencies]
 libc = "0.2"
 # A zipped game's ROM, unpacked to be hashed (`zip`): as DSlot reads zips.
-zip = { version = "2.4.2", default-features = false, features = ["deflate-miniz"], optional = true }
+zip = { version = "9.4.2", default-features = false, features = ["deflate-flate2-zlib-rs"], optional = true }
 # A CHD's hunks, decompressed (`chd`).
 chd = { version = "0.3", optional = true }
 # A CSO's deflated blocks (`cso`).

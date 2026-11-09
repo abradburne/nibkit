@@ -19,6 +19,10 @@ pub struct Menu {
     pub scroll: usize,
     /// The buttons' line above the bar: what each does here.
     pub hint: String,
+    /// A page of text to read (What's new, a help topic: [`super::guide`]) rather than rows to
+    /// choose from: no row is highlighted, up and down scroll it a line, left and right a
+    /// screen, and a finger dragging it scrolls it ([`Menu::drag`]).
+    pub reading: bool,
 }
 
 /// One row: its label on the left, its value on the right.

@@ -2,7 +2,9 @@
 //! highlight (past headings, keeping it on screen), left and right change the row, A chooses,
 //! Y goes back to the level above, L and R turn the page, B goes back. A tap highlights a row;
 //! a tap on the highlighted row acts on it, as A would (or steps its value, back on its left
-//! third). The app does what the [`Effect`] says and fills the page in again.
+//! third). The app does what the [`Effect`] says and fills the page in again. A page of text to
+//! read ([`Menu::reading`]) has no highlight: up and down scroll it a line, left and right a
+//! screen, and a finger drags it ([`Menu::drag`]).
 
 use super::layout::{self, VISIBLE};
 use super::model::{Menu, Shelf, Value};
@@ -72,9 +74,41 @@ impl Menu {
         self.rows.get(i).is_some_and(|r| !r.heading)
     }
 
+    /// The furthest a page of text to read scrolls: its last line at the bottom of the screen.
+    pub fn most_scroll(&self) -> usize {
+        self.rows.len().saturating_sub(VISIBLE)
+    }
+
+    /// Scrolls a page of text to read by `lines` (back for fewer than 0), no further than its
+    /// ends. Whether it moved.
+    pub fn scroll_by(&mut self, lines: i32) -> bool {
+        let to = (self.scroll as i64 + lines as i64).clamp(0, self.most_scroll() as i64) as usize;
+        let moved = to != self.scroll;
+        self.scroll = to;
+        moved
+    }
+
+    /// A finger dragging a page of text to read: `from` is where the page was scrolled to when
+    /// the finger came down, `dy` how far it has moved since, in screen units (down is more).
+    /// The page follows the finger a line at a time. Whether it moved.
+    pub fn drag(&mut self, from: usize, dy: f32) -> bool {
+        if !self.reading || !dy.is_finite() {
+            return false;
+        }
+        let lines = (dy / layout::ROW_STEP).round() as i64;
+        let to = (from as i64 - lines).clamp(0, self.most_scroll() as i64) as usize;
+        let moved = to != self.scroll;
+        self.scroll = to;
+        moved
+    }
+
     /// Puts the highlight on a row that takes it (the first after a heading) and scrolls so
-    /// it shows.
+    /// it shows; on a page of text to read, keeps it scrolled no further than its end.
     pub fn settle(&mut self) {
+        if self.reading {
+            self.scroll = self.scroll.min(self.most_scroll());
+            return;
+        }
         if !self.takes(self.row) {
             if let Some(i) = (self.row..self.rows.len())
                 .chain(0..self.row)
@@ -111,6 +145,20 @@ impl Menu {
 
     /// A button.
     pub fn key(&mut self, key: Key) -> Option<Effect> {
+        if self.reading {
+            let page = VISIBLE as i32 - 1;
+            match key {
+                Key::Up => self.scroll_by(-1),
+                Key::Down => self.scroll_by(1),
+                Key::Left => self.scroll_by(-page),
+                Key::Right => self.scroll_by(page),
+                Key::L => return turn(&self.tabs, -1),
+                Key::R => return turn(&self.tabs, 1),
+                Key::B => return Some(Effect::Back),
+                Key::A | Key::X | Key::Y => false,
+            };
+            return None;
+        }
         match key {
             Key::Up => {
                 self.step(-1);
@@ -149,6 +197,10 @@ impl Menu {
         let labels: Vec<&str> = self.tabs.iter().map(|(l, _)| l.as_str()).collect();
         if let Some(t) = layout::tab_at(x, y, &labels) {
             return (!self.tabs[t].1).then_some(Effect::Page(t));
+        }
+        // Text to read has nothing to tap: a finger on it drags it ([`Menu::drag`]).
+        if self.reading {
+            return None;
         }
         let i = self.scroll + layout::row_hit(y)?;
         if !self.takes(i) {
@@ -237,6 +289,7 @@ mod tests {
             row: 0,
             scroll: 0,
             hint: String::new(),
+            reading: false,
         }
     }
 
@@ -319,6 +372,75 @@ mod tests {
             m.key(Key::Up);
         }
         assert_eq!((m.row, m.scroll), (0, 0));
+    }
+
+    #[test]
+    fn text_to_read_scrolls_without_a_highlight() {
+        let mut m = Menu {
+            tabs: vec![("Game".into(), false), ("System".into(), true)],
+            rows: (0..25)
+                .map(|i| Row::new(format!("line {i}"), Value::None))
+                .collect(),
+            reading: true,
+            ..Menu::default()
+        };
+        m.settle();
+        assert_eq!(m.key(Key::Up), None);
+        assert_eq!(m.scroll, 0, "no further than the top");
+        m.key(Key::Down);
+        m.key(Key::Down);
+        assert_eq!(m.scroll, 2);
+        m.key(Key::Right);
+        assert_eq!(m.scroll, 11, "a screen less a line");
+        m.key(Key::Right);
+        assert_eq!(m.scroll, 15, "the last line at the bottom");
+        assert_eq!(m.most_scroll(), 15);
+        m.key(Key::Left);
+        assert_eq!(m.scroll, 6);
+        assert_eq!(m.key(Key::A), None, "nothing to choose");
+        assert_eq!(m.key(Key::B), Some(Effect::Back));
+        assert_eq!(m.key(Key::L), Some(Effect::Page(0)));
+        assert_eq!(
+            m.touch(600.0, layout::row_y(3)),
+            None,
+            "a line takes no tap"
+        );
+        assert_eq!(
+            m.touch(60.0, 20.0),
+            Some(Effect::Page(0)),
+            "a tab still does"
+        );
+    }
+
+    #[test]
+    fn a_finger_drags_text_to_read() {
+        let mut m = Menu {
+            rows: (0..25)
+                .map(|i| Row::new(format!("line {i}"), Value::None))
+                .collect(),
+            reading: true,
+            scroll: 5,
+            ..Menu::default()
+        };
+        let step = layout::ROW_STEP;
+        assert!(!m.drag(5, step * 0.4), "less than half a line: not yet");
+        assert!(m.drag(5, -step * 3.0), "up three lines: three further on");
+        assert_eq!(m.scroll, 8);
+        assert!(m.drag(5, step * 2.0));
+        assert_eq!(m.scroll, 3);
+        m.drag(5, step * 40.0);
+        assert_eq!(m.scroll, 0);
+        m.drag(5, -step * 40.0);
+        assert_eq!(m.scroll, 15);
+        assert!(!m.drag(5, f32::NAN));
+        m.reading = false;
+        assert!(!m.drag(5, step * 2.0), "a page of rows isn't dragged");
+        // Shorter than the screen: nowhere to scroll.
+        m.rows.truncate(4);
+        m.reading = true;
+        m.settle();
+        assert_eq!(m.scroll, 0);
+        assert!(!m.scroll_by(1));
     }
 
     #[test]

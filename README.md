@@ -39,7 +39,7 @@ Rust 1.87 or later.
 | Crate | |
 |---|---|
 | `nibkit` (this directory) | The Rust library. |
-| [`nibkit-menu-c`](nibkit-menu-c/README.md) | nibkit for C and C++ apps: the menu, the Connections page, DSlot's settings and an emulator's options, as a static library and `include/nibkit_menu.h`. |
+| [`nibkit-menu-c`](nibkit-menu-c/README.md) | nibkit for C and C++ apps: the menu, the Connections and Help pages, DSlot's settings and an emulator's options, as a static library and `include/nibkit_menu.h`. |
 | [`nib-cheevos`](nib-cheevos/README.md) | RetroAchievements for nibOS's emulators and DSlot: rcheevos (vendored, MIT) for the session, every console's hash and the service's requests; the launcher's sign-in hand-over; `curl` as the transport. Needs a C compiler. |
 
 ## On a desktop

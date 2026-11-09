@@ -31,8 +31,8 @@
 extern "C" {
 #endif
 
-/* This header's version: major * 10000 + minor * 100 + patch (0.2.3). */
-#define NIBKIT_MENU_VERSION 203
+/* This header's version: major * 10000 + minor * 100 + patch (0.3.0). */
+#define NIBKIT_MENU_VERSION 300
 
 /* The library's version, as NIBKIT_MENU_VERSION in the header it was built with: a program
  * that uses a function added after the oldest library it supports checks it at run time. */
@@ -119,6 +119,12 @@ void nib_menu_set_card(NibMenu *m, int card);
 NibEffect nib_menu_key(NibMenu *m, int key);
 /* A finger down at (x, y), in screen units (0-1024, 0-768). */
 NibEffect nib_menu_touch(NibMenu *m, float x, float y);
+/* A finger on a page of text to read (the Help page's topics, below), which has no highlight
+ * and no rows to tap: give it every touch, NIB_DRAG_DOWN where the finger comes down,
+ * NIB_DRAG_MOVE where it moves to, NIB_DRAG_UP when it lifts (y in screen units). The page
+ * follows the finger a line at a time; 1 if it scrolled (draw it again). Since 0.3.0. */
+enum { NIB_DRAG_DOWN = 0, NIB_DRAG_MOVE = 1, NIB_DRAG_UP = 2 };
+int nib_menu_drag(NibMenu *m, int phase, float y);
 
 /* The page drawn, RGBA, rows top first, `*width` x `*height` (1024 x 768): valid until the next
  * call on `m`. */
@@ -251,6 +257,44 @@ const char *nib_connections_hint(void);
 int nib_connections_fill(NibConnections *c, NibMenu *m);
 /* Acts on the page's row `row` (counted from its first): 1 if it did something. */
 int nib_connections_act(NibConnections *c, int row);
+
+/* ---- The Help page ---------------------------------------------------------------------------
+ *
+ * What's new in the running release and the system's help topics (nibOS keeps them as text
+ * files in /usr/share/nibos: nibkit's `guide`), listed, and each read as a page of text, as
+ * DSlot's System -> Help shows them: a page of its own, or a row on the System page that opens
+ * it. Up / down scroll a topic a line, left / right a screen, and a finger drags it. Keep one
+ * while the menu is open (since 0.3.0):
+ *
+ *     NibHelp *h = nib_help_new();          // NULL: no files here (the stock OS)
+ *     // filling the page, each time it is shown:
+ *     nib_menu_begin(m, nib_help_title(h), nib_help_hint(h));
+ *     nib_menu_tab(m, "Play", 0); ... nib_menu_tab(m, "System", 1);
+ *     nib_help_fill(h, m);                  // the rows are the page's whole
+ *     // on NIB_EFFECT_CHOOSE for row `index`:
+ *     nib_help_choose(h, e.index);
+ *     // on NIB_EFFECT_BACK: back to the list, or (0) leave the page as B would
+ *     if (!nib_help_back(h)) { ... }
+ *     // every touch, for a topic dragged with a finger:
+ *     nib_menu_drag(m, NIB_DRAG_DOWN, y); ...
+ *     // the menu closing:
+ *     nib_help_free(h);
+ */
+typedef struct NibHelp NibHelp;
+NibHelp *nib_help_new(void);
+void nib_help_free(NibHelp *h);
+/* The topic being read ("Controls"), or "Help"; valid until the next call on `h`. */
+const char *nib_help_title(NibHelp *h);
+/* The list's hint, or the one for reading; valid until this is next called on `h`. */
+const char *nib_help_hint(NibHelp *h);
+/* Puts the page's title, hint and rows on `m`, the list or the topic's lines; returns 0. */
+int nib_help_fill(NibHelp *h, NibMenu *m);
+/* Reads the topic on the list's row `row`: 1 if it opened one. */
+int nib_help_choose(NibHelp *h, int row);
+/* From a topic back to the list: 1; 0 on the list (B is the app's). */
+int nib_help_back(NibHelp *h);
+/* 1 while a topic is read. */
+int nib_help_reading(NibHelp *h);
 
 /* ---- Toasts over a game that is playing -----------------------------------------------------
  *

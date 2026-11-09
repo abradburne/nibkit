@@ -4,6 +4,7 @@
 //! battery and the volume (`system`).
 
 mod connections;
+mod help;
 mod level;
 mod options;
 mod system;
@@ -25,6 +26,9 @@ pub struct NibMenu {
     top: Canvas,
     /// The last string handed out (the clock).
     pub(crate) scratch: std::ffi::CString,
+    /// A finger dragging a page of text to read: where it came down, and where the page was
+    /// scrolled to then.
+    drag: Option<(f32, usize)>,
 }
 
 /// `NibEffect`.
@@ -148,6 +152,7 @@ pub extern "C" fn nib_menu_new() -> *mut NibMenu {
         canvas: Canvas::new(1.0),
         top: Canvas::new(1.0),
         scratch: std::ffi::CString::default(),
+        drag: None,
     }))
 }
 
@@ -190,6 +195,8 @@ pub unsafe extern "C" fn nib_menu_begin(
             m.menu.rows.clear();
             m.menu.title = title;
             m.menu.hint = hint.clone();
+            // A page to read says so each time it is filled (nib_help_fill).
+            m.menu.reading = false;
             m.shelf.tabs.clear();
             m.shelf.cards.clear();
             m.shelf.hint = hint;
@@ -425,6 +432,32 @@ pub unsafe extern "C" fn nib_menu_touch(m: *mut NibMenu, x: c_float, y: c_float)
                 effect(m.shelf.touch(x, y))
             } else {
                 effect(m.menu.touch(x, y))
+            }
+        })
+    }
+}
+
+/// A finger on a page of text to read: `phase` 0 down at `y`, 1 moved to `y`, 2 lifted (screen
+/// units). The page follows it a line at a time. 1 if the page scrolled (draw it again), else 0.
+///
+/// # Safety
+/// `m` is a live `NibMenu`.
+#[no_mangle]
+pub unsafe extern "C" fn nib_menu_drag(m: *mut NibMenu, phase: c_int, y: c_float) -> c_int {
+    // SAFETY: the caller's promise.
+    unsafe {
+        with(m, 0, |m| match phase {
+            0 => {
+                m.drag = (m.menu.reading && y.is_finite()).then_some((y, m.menu.scroll));
+                0
+            }
+            1 => match m.drag {
+                Some((from, scroll)) => m.menu.drag(scroll, y - from) as c_int,
+                None => 0,
+            },
+            _ => {
+                m.drag = None;
+                0
             }
         })
     }

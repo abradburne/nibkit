@@ -4,6 +4,26 @@ nibkit, nibkit-menu-c and nib-cheevos, which are released together. Until 0.1.0 
 nibkit-menu-c lived in nibOS's repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their
 history starts.
 
+## 0.5.0
+
+- **guide** (new): the words nibOS keeps for its menus, as plain text files: What's new in the
+  running release (`/usr/share/nibos/whats-new.txt`, which nibOS's image build writes from its
+  changelog) and short help topics (`/usr/share/nibos/help/*.txt`, in the order of their names).
+  `whats_new()` and `help()` read them (`NIBOS_GUIDE` names another folder, to try topics out);
+  a file's first line is its title. `lines(text, width)` breaks the rest into lines for a small
+  screen: lines next to each other are one paragraph, `# ` starts a heading and `- ` an item of
+  a list, its indented lines under it.
+- **menu**: a page of text to read. `Menu::reading` (a new field: a struct literal needs it, so
+  this is 0.5) draws the rows without a highlight, all in white; up and down scroll it a line,
+  left and right a screen, a tap on it does nothing, and `Menu::drag` follows a finger a line at
+  a time. `Menu::scroll_by` and `Menu::most_scroll` are the same steps for an app's own keys.
+- **menu** `help` (new): the Help page, ready-made: What's new and the help topics listed, each
+  read as a page of text. `Help::fill` puts it on a `Menu`; A's row goes to `Help::choose`, B to
+  `Help::back`, which says whether it went back to the list.
+- **nibkit-menu-c** 0.3.0 (300): `nib_help_*`, the Help page for C and C++, and
+  `nib_menu_drag` for a finger on a page of text. `nib_menu_begin` leaves the page not for
+  reading; `nib_help_fill` makes it one while a topic is open.
+
 ## 0.4.1
 
 - **nib-cheevos** `zip`: the zip reader is zip 9.4 (from 2.6), which fixes the zip crate's

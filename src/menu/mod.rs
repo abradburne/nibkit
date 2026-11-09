@@ -14,6 +14,9 @@
 //! - [`keyboard`] is the on-screen keyboard, for a passphrase, a PIN or a search.
 //! - `connections` (with feature `net-control`) is a ready-made page of Wi-Fi and Bluetooth
 //!   on or off and the paired devices to connect, for a game's pause menu.
+//! - [`help`] is a ready-made Help page: What's new in the running release and the system's
+//!   help topics ([`crate::guide`]), each read as a page of text ([`Menu::reading`]) that
+//!   scrolls with the D-pad or a finger ([`Menu::drag`]).
 //! - [`top`] lays out the top screen while the menu is open: the game paused, or a save
 //!   state's picture and details.
 //! - [`raster`] (feature `menu-raster`) draws the [`Draw`]s into an RGBA picture in Roboto
@@ -39,6 +42,7 @@
 //!     row: 0,
 //!     scroll: 0,
 //!     hint: "A  choose   ·   B  resume".into(),
+//!     reading: false,
 //! };
 //! let draws = layout::menu(&menu, &Status::default());
 //! assert!(!draws.is_empty());
@@ -47,6 +51,7 @@
 #[cfg(feature = "net-control")]
 pub mod connections;
 pub mod glyphs;
+pub mod help;
 #[cfg(feature = "menu-raster")]
 pub mod indicators;
 mod input;

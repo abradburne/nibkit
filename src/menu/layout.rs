@@ -379,7 +379,7 @@ pub fn menu_measured(
             ));
             continue;
         }
-        let lit = i == m.row;
+        let lit = i == m.row && !m.reading;
         if lit {
             out.push(Draw::Rect {
                 x: 120.0,
@@ -389,7 +389,12 @@ pub fn menu_measured(
                 colour: colour::PANEL,
             });
         }
-        let ink = if lit { colour::WHITE } else { colour::DIM };
+        // Text to read is all of it white: there is no highlight to stand out from it.
+        let ink = if lit || m.reading {
+            colour::WHITE
+        } else {
+            colour::DIM
+        };
         out.push(text(&row.label, (26.0, false), (LEFT, y - 16.0), 0.0, ink));
         let value = (26.0, true);
         // How wide the value is drawn, so that its note goes just left of it.
@@ -710,6 +715,7 @@ mod tests {
             row,
             scroll: 0,
             hint: "A  choose".into(),
+            reading: false,
         }
     }
 
@@ -803,6 +809,31 @@ mod tests {
         assert_eq!(marks(&m), 1, "more above, none below");
         m.scroll = 2;
         assert_eq!(marks(&m), 2);
+    }
+
+    #[test]
+    fn text_to_read_has_no_highlight() {
+        let rows = vec![
+            Row::new("Close the lid to sleep.", Value::None),
+            Row::new("Open it to wake.", Value::None),
+        ];
+        let mut m = page(rows, 0);
+        let bands = |m: &Menu| {
+            menu(m, &Status::default())
+                .iter()
+                .filter(|d| matches!(d, Draw::Rect { colour, .. } if *colour == colour::PANEL))
+                .count()
+        };
+        // The unselected tab is a panel too: the highlight is the one more.
+        let with_highlight = bands(&m);
+        m.reading = true;
+        assert_eq!(bands(&m), with_highlight - 1);
+        let lines: Vec<_> = texts(&menu(&m, &Status::default()))
+            .into_iter()
+            .filter(|t| t.0.ends_with('.'))
+            .collect();
+        assert_eq!(lines.len(), 2);
+        assert!(lines.iter().all(|t| t.3 == colour::WHITE && t.1 == LEFT));
     }
 
     #[test]

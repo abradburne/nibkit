@@ -12,6 +12,7 @@
 //! | [`backlight`] | Each screen's brightness, in percent. |
 //! | [`battery`] | The battery's charge, time to full, and battery protect (stop at about 80%). |
 //! | [`device`] | Volume, Wi-Fi, sleeping, restarting, powering off. |
+//! | [`guide`] | What's new in the running release and the help topics, as the system keeps them for its menus. |
 //! | [`levels`] | What the volume keys just changed (the volume, or Menu + volume's brightness), for an indicator. |
 //! | [`net`] | The radios for a status bar: Wi-Fi off, connecting or connected (and its signal), Bluetooth off, on or connected. |
 //! | [`power`] | The power menu's request (a long press of power on nibOS), and what a game does when it is put away for it. |
@@ -35,6 +36,7 @@ pub mod clock;
 pub mod device;
 #[cfg(feature = "dslot")]
 pub mod dslot;
+pub mod guide;
 pub mod input;
 pub mod levels;
 #[cfg(feature = "menu")]

@@ -594,6 +594,7 @@ mod tests {
             row: 1,
             scroll: 0,
             hint: "A  choose".into(),
+            reading: false,
         };
         let status = Status {
             clock: "5:05 PM".into(),

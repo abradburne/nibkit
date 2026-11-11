@@ -4,7 +4,7 @@ nibkit, nibkit-menu-c and nib-cheevos, which are released together. Until 0.1.0 
 nibkit-menu-c lived in nibOS's repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their
 history starts.
 
-## Unreleased
+## 0.6.0
 
 - **battery**: nibOS's low-battery alerts (nibOS's `nibos-battery`: a warning at 10% and 5%, a
   clean power-off near empty). `alert()` reads the one up now; `Alerts` gives each once, when

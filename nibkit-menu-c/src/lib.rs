@@ -3,6 +3,7 @@
 //! DSlot's settings and an emulator's declared options (`options`), brightness, the clock, the
 //! battery and the volume (`system`).
 
+mod battery;
 mod connections;
 mod help;
 mod level;

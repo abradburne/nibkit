@@ -4,6 +4,19 @@ nibkit, nibkit-menu-c and nib-cheevos, which are released together. Until 0.1.0 
 nibkit-menu-c lived in nibOS's repository (`sdk/nibkit`, `sdk/nibkit-menu-c`), where their
 history starts.
 
+## Unreleased
+
+- **battery**: nibOS's low-battery alerts (nibOS's `nibos-battery`: a warning at 10% and 5%, a
+  clean power-off near empty). `alert()` reads the one up now; `Alerts` gives each once, when
+  the battery gets worse, for a toast over a game, and `Alerts::now()` the one up at every
+  change. `None` off nibOS.
+- **menu** `battery` (new): the low-battery indicator over a game, at the screen's top right:
+  DSlot's battery icon in red and the percent left, up from 5% till the charger goes in or the
+  device powers off.
+- **nibkit-menu-c** (header 0.4.0): `nib_battery_*`, their C face: `nib_battery_tick` once a
+  frame, `nib_battery_news` for a toast when the battery gets worse, `nib_battery_render` for
+  the indicator.
+
 ## 0.5.0
 
 - **guide** (new): the words nibOS keeps for its menus, as plain text files: What's new in the

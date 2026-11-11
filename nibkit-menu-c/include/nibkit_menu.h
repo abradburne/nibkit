@@ -31,8 +31,8 @@
 extern "C" {
 #endif
 
-/* This header's version: major * 10000 + minor * 100 + patch (0.3.0). */
-#define NIBKIT_MENU_VERSION 300
+/* This header's version: major * 10000 + minor * 100 + patch (0.4.0). */
+#define NIBKIT_MENU_VERSION 400
 
 /* The library's version, as NIBKIT_MENU_VERSION in the header it was built with: a program
  * that uses a function added after the oldest library it supports checks it at run time. */
@@ -525,6 +525,45 @@ const uint8_t *nib_levels_render(NibLevels *l, int frame_w, int frame_h, int *wi
 int nib_levels_lift(const NibLevels *l, int frame_w, int frame_h);
 /* Hides it at once (a menu opens over the game). */
 void nib_levels_hide(NibLevels *l);
+
+/* ---- The low battery (0.4.0) ---------------------------------------------------------------
+ *
+ * nibOS warns when the battery runs low (at 10% and 5%) and powers off cleanly near empty, when
+ * the app gets SIGTERM as from the power menu. A NibBattery watches for that from when it is
+ * made: each time the battery gets worse, news for a toast (nib_battery_news), and from 5% on an
+ * indicator that stays at the top right, DSlot's battery icon in red and the percent left, till
+ * the charger goes in or the device powers off. Off nibOS it never shows anything.
+ *
+ *     NibBattery *bat = nib_battery_new();
+ *     // once a frame:
+ *     uint64_t shown = nib_battery_tick(bat);
+ *     const char *title, *detail;
+ *     if (nib_battery_news(bat, &title, &detail))
+ *         ...a problem toast: title, detail...
+ *     if (shown != last) {                           // another percent, or gone (0)
+ *         int w, h, x, y;
+ *         const uint8_t *px = nib_battery_render(bat, frame_w, frame_h, &w, &h, &x, &y);
+ *         // px NULL: none; else lay it over the frame at (x, y) until it changes
+ *         last = shown;
+ *     }
+ *
+ * The tick is cheap: the alert file is read only when inotify says it changed. The picture is
+ * drawn (a few hundred pixels of text) when the percent changes. Check nib_menu_version() >=
+ * 400 before calling these against a library that may be older. */
+typedef struct NibBattery NibBattery;
+
+NibBattery *nib_battery_new(void);
+void nib_battery_free(NibBattery *b);
+/* What is on show: 0 for nothing, else a number that changes whenever the picture does. */
+uint64_t nib_battery_tick(NibBattery *b);
+/* 1 once each time the battery gets worse, with a toast's title and the line under it
+ * (NUL-terminated, valid until the next call on `b`); 0 with nothing new. */
+int nib_battery_news(NibBattery *b, const char **title, const char **detail);
+/* The indicator as the last tick found it, for a `frame_w` x `frame_h` frame: RGBA, straight
+ * alpha, rows top first, its size and where its top left goes; NULL with nothing on show. Valid
+ * until the next call on `b`. */
+const uint8_t *nib_battery_render(NibBattery *b, int frame_w, int frame_h, int *width,
+                                  int *height, int *x, int *y);
 
 #ifdef __cplusplus
 }

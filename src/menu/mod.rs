@@ -48,6 +48,8 @@
 //! assert!(!draws.is_empty());
 //! ```
 
+#[cfg(feature = "menu-raster")]
+pub mod battery;
 #[cfg(feature = "net-control")]
 pub mod connections;
 pub mod glyphs;

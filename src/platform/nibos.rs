@@ -122,6 +122,8 @@ pub const SYSTEM_APPS: &[&str] = &["/usr/share/dslot/apps"];
 pub const BACKLIGHT_SAVE: Option<&[&str]> = Some(&["nibos-backlight", "save"]);
 /// The battery and charger as nibos-hw names them: links to their power supplies.
 pub const BATTERY: Option<(&str, &str)> = Some(("/run/nibos/battery", "/run/nibos/charger"));
+/// Where nibos-battery says the low battery's level (`low 5`), for apps to warn over a game.
+pub const BATTERY_ALERT: Option<&str> = Some("/run/nibos/battery-alert");
 /// Turns battery protect on or off and keeps it (`nib battery protect on|off`).
 pub const BATTERY_PROTECT: Option<&[&str]> = Some(&["nib", "battery", "protect"]);
 /// The speaker amps' tuning: `nib audio` (sudo -n for changes; the wheel group may).

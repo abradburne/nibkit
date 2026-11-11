@@ -67,6 +67,7 @@ pub const BOARD_CONF: &str = "";
 pub const SYSTEM_APPS: &[&str] = &[];
 pub const BACKLIGHT_SAVE: Option<&[&str]> = None;
 pub const BATTERY: Option<(&str, &str)> = None;
+pub const BATTERY_ALERT: Option<&str> = None;
 pub const BATTERY_PROTECT: Option<&[&str]> = None;
 pub const AMP_TUNING: Option<&str> = None;
 pub const VOLUME: bool = false;

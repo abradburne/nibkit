@@ -16,6 +16,19 @@
 //!     battery::set_protect(true).ok();
 //! }
 //! ```
+//!
+//! **The low battery.** nibOS warns at 10% and 5% and powers off cleanly near empty (a running
+//! game gets SIGTERM, as for the power menu). The shelf shows the warning itself; an app that
+//! takes the screens shows it over its game with an [`Alerts`], asked once a frame:
+//!
+//! ```no_run
+//! let mut alerts = nibkit::battery::Alerts::new();
+//! // Once a frame:
+//! if let Some(alert) = alerts.take() {
+//!     // e.g. toasts.push(Notice::new(Kind::Problem, alert.title()).detail(alert.detail()))
+//!     println!("{}: {}", alert.title(), alert.detail());
+//! }
+//! ```
 
 use crate::platform;
 pub use crate::watch::Watch;
@@ -133,6 +146,127 @@ pub fn watch() -> Option<Watch> {
     Watch::new(&[format!("{battery}/constant_charge_voltage")])
 }
 
+/// A low-battery warning from nibOS, worse than the one before it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Alert {
+    /// Under the first line (10%): the charge left, in percent.
+    Warn(u8),
+    /// Under the second (5%): nibOS will save the game and power off before it runs out.
+    Low(u8),
+    /// Empty: nibOS is powering off now; the game is about to be asked to save and quit.
+    Critical,
+}
+
+impl Alert {
+    /// A line of the alert file: `ok 50`, `warn 9`, `low 5`, `critical 2`. `None` for ok or
+    /// anything else.
+    pub fn parse(line: &str) -> Option<Alert> {
+        let mut words = line.split_whitespace();
+        let level = words.next()?;
+        let percent = words.next().and_then(|p| p.parse::<u8>().ok()).unwrap_or(0);
+        match level {
+            "warn" => Some(Alert::Warn(percent)),
+            "low" => Some(Alert::Low(percent)),
+            "critical" => Some(Alert::Critical),
+            _ => None,
+        }
+    }
+
+    /// How bad it is, for comparing: 1 warn, 2 low, 3 critical.
+    fn rank(self) -> u8 {
+        match self {
+            Alert::Warn(_) => 1,
+            Alert::Low(_) => 2,
+            Alert::Critical => 3,
+        }
+    }
+
+    /// A toast's title.
+    pub fn title(self) -> &'static str {
+        match self {
+            Alert::Warn(_) => "Battery low",
+            Alert::Low(_) => "Battery very low",
+            Alert::Critical => "Battery empty",
+        }
+    }
+
+    /// The line under it.
+    pub fn detail(self) -> String {
+        match self {
+            Alert::Warn(p) => format!("{p}% left: plug in the charger soon"),
+            Alert::Low(p) => format!("{p}% left: saving and powering off soon"),
+            Alert::Critical => "Saving and powering off".into(),
+        }
+    }
+}
+
+/// The alert now, `None` while the battery is fine or where the system says nothing.
+pub fn alert() -> Option<Alert> {
+    Alert::parse(&std::fs::read_to_string(platform::BATTERY_ALERT?).ok()?)
+}
+
+/// nibOS's low-battery alerts as they come, for an app to show over its game: each one once,
+/// when the battery gets worse (a level down, not every percent). Cheap to ask every frame: it
+/// reads the file only when inotify says it changed.
+pub struct Alerts {
+    watch: Option<Watch>,
+    shown: Option<Alert>,
+    now: Option<Alert>,
+    looked: bool,
+}
+
+impl Alerts {
+    /// Starts watching; the first [`Alerts::take`] says the alert already up, if any.
+    pub fn new() -> Alerts {
+        Alerts {
+            watch: platform::BATTERY_ALERT.and_then(|f| Watch::new(&[f.to_owned()])),
+            shown: None,
+            now: None,
+            looked: false,
+        }
+    }
+
+    /// A new, worse alert since the last call, to show once.
+    pub fn take(&mut self) -> Option<Alert> {
+        let changed = self.watch.as_mut().is_some_and(Watch::changed);
+        if self.looked && !changed {
+            return None;
+        }
+        self.looked = true;
+        self.update(alert())
+    }
+
+    /// The alert up now, as the last [`Alerts::take`] read it (every change, not only the news):
+    /// for an indicator that stays on screen while the battery is low.
+    pub fn now(&self) -> Option<Alert> {
+        self.now
+    }
+
+    /// Takes in the alert up `now`, read some other way, and says the news as
+    /// [`Alerts::take`] does: news only when worse; back to fine (the charger) forgets, so the
+    /// next drain warns again.
+    pub fn update(&mut self, now: Option<Alert>) -> Option<Alert> {
+        self.now = now;
+        match now {
+            None => {
+                self.shown = None;
+                None
+            }
+            Some(a) if self.shown.is_none_or(|s| a.rank() > s.rank()) => {
+                self.shown = Some(a);
+                Some(a)
+            }
+            Some(_) => None,
+        }
+    }
+}
+
+impl Default for Alerts {
+    fn default() -> Alerts {
+        Alerts::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,5 +289,37 @@ mod tests {
             ..b
         };
         assert_eq!(discharging.time_to_full(), None);
+    }
+
+    #[test]
+    fn alert_lines() {
+        assert_eq!(Alert::parse("warn 9\n"), Some(Alert::Warn(9)));
+        assert_eq!(Alert::parse("low 5"), Some(Alert::Low(5)));
+        assert_eq!(Alert::parse("critical 2"), Some(Alert::Critical));
+        assert_eq!(Alert::parse("ok 100"), None);
+        assert_eq!(Alert::parse(""), None);
+        assert!(Alert::Warn(9).detail().contains("9%"));
+    }
+
+    #[test]
+    fn each_alert_once_and_only_when_worse() {
+        let mut alerts = Alerts {
+            watch: None,
+            shown: None,
+            now: None,
+            looked: true,
+        };
+        assert_eq!(alerts.update(Some(Alert::Warn(10))), Some(Alert::Warn(10)));
+        assert_eq!(alerts.update(Some(Alert::Warn(9))), None);
+        assert_eq!(
+            alerts.now(),
+            Some(Alert::Warn(9)),
+            "every change, not only news"
+        );
+        assert_eq!(alerts.update(Some(Alert::Low(5))), Some(Alert::Low(5)));
+        assert_eq!(alerts.update(Some(Alert::Warn(11))), None);
+        // The charger: forgotten, and the next drain warns again.
+        assert_eq!(alerts.update(None), None);
+        assert_eq!(alerts.update(Some(Alert::Warn(10))), Some(Alert::Warn(10)));
     }
 }
